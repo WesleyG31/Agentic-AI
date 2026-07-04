@@ -59,18 +59,18 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 ## Capability checklist (what's actually built)
 
 ### Tier 1 — Core
-- [ ] Adaptive retrieval (RAG hybrid + CAG + NL2SQL, router per query)
-- [ ] Orchestration / planning (supervisor + routing)
+- [x] Adaptive retrieval (RAG hybrid + CAG + NL2SQL, router per query) — *GraphRAG pending*
+- [ ] Orchestration / planning (supervisor + routing) — *single-agent tool orchestration live; supervisor pending*
 - [ ] Multi-agent workers (+ single-agent mode)
-- [ ] Tool use via **MCP** (doc-search, sql, ticketing servers)
-- [ ] Memory (short-term conversation + long-term per-user)
+- [x] Tool use via **MCP** (doc-search, sql, ticketing servers over stdio)
+- [ ] Memory — *short-term (per-thread checkpointer) live; long-term per-user store pending*
 - [ ] Reflection / self-correction (grounding check)
-- [ ] **Human-in-the-loop** declarative + durable + resumable (HITL middleware)
-- [ ] Guardrails (grounding+citations, prompt-injection, PII/GDPR, typed outputs)
+- [x] **Human-in-the-loop** declarative + durable + resumable (HITL middleware, verified live)
+- [ ] Guardrails — *citations, read-only SQL boundary, arg validation live; injection/PII pending*
 - [ ] Streaming + observability (Langfuse)
 - [ ] Evaluation (golden set + RAGAS + task-completion + value metrics + baseline)
-- [ ] Model routing + caching + token budgets
-- [ ] Deploy/MLOps (Docker, CI/CD, versioned prompts, durable checkpointer)
+- [x] Model routing (fast/balanced/reasoning tiers via config) — *token budgets pending*
+- [ ] Deploy/MLOps — *CI + compose infra live; Dockerfile + versioned prompts pending*
 
 ### Tier 2 — Advanced
 - [ ] A2A protocol (signed Agent Card + peer coordination)
