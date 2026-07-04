@@ -71,5 +71,11 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0", alias="KOMPASS_API_HOST")
     api_port: int = Field(default=8000, alias="KOMPASS_API_PORT")
 
+    # ── A2A ───────────────────────────────────────────────────────────
+    # Agent-to-agent surface (kompass/a2a): the card-signing secret and the
+    # port the standalone A2A server listens on.
+    a2a_secret: str = Field(default="dev-secret-change-me", alias="KOMPASS_A2A_SECRET")
+    a2a_port: int = Field(default=8030, alias="KOMPASS_A2A_PORT")
+
 
 settings = Settings()
