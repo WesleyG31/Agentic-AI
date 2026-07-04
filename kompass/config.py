@@ -77,5 +77,10 @@ class Settings(BaseSettings):
     a2a_secret: str = Field(default="dev-secret-change-me", alias="KOMPASS_A2A_SECRET")
     a2a_port: int = Field(default=8030, alias="KOMPASS_A2A_PORT")
 
+    # ── Triggers ──────────────────────────────────────────────────────
+    # Event-driven surface (kompass/triggers): the port the standalone
+    # webhook app listens on.
+    trigger_port: int = Field(default=8040, alias="KOMPASS_TRIGGER_PORT")
+
 
 settings = Settings()

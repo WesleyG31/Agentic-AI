@@ -13,7 +13,7 @@ write tools — and the HITL gate — stay here.
 import sys
 
 from langchain.agents import create_agent
-from langchain.agents.middleware import HumanInTheLoopMiddleware
+from langchain.agents.middleware import HumanInTheLoopMiddleware, TodoListMiddleware
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from kompass.config import ROOT, settings
@@ -53,6 +53,15 @@ RESEARCH_RULES = {
     "multi": "- Delegate all policy/data research to the research tool; act only on evidence "
     "it returns.",
 }
+
+PLANNING_PROMPT = """## Planning with `write_todos`
+
+Any request that takes several steps — combining data lookups, policy checks and/or actions —
+is plan-and-execute: before acting, call `write_todos` with a short numbered plan (first step
+in_progress), then work through it, updating statuses as steps land. If a step fails or the
+evidence contradicts the plan, revise the todo list before continuing. Skip planning for
+single-lookup or purely conversational requests. Deliver the final answer as a normal message
+after the last `write_todos` call — the todo list tracks work, it is not the answer."""
 
 INTERRUPT_ON = {
     "create_refund": {"allowed_decisions": ["approve", "edit", "reject"]},
@@ -95,6 +104,11 @@ async def build_agent(checkpointer, mode: str | None = None):
         tools=tools + [save_memory, recall_memories],
         system_prompt=SYSTEM_PROMPT.format(research_rule=RESEARCH_RULES[mode]),
         middleware=[
+            # Plan-and-execute: write_todos lets the model lay out a numbered plan
+            # for multi-step requests and revise it as steps land or fail; the plan
+            # lives in graph state ("todos"), so every surface can render progress.
+            # The default prompt is too reluctant for support work, hence the override.
+            TodoListMiddleware(system_prompt=PLANNING_PROMPT),
             GroundingCritic(),
             HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON),
         ],

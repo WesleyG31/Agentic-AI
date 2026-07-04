@@ -77,16 +77,17 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 - [x] Deploy/MLOps — Dockerfile (288 MB) + CI + compose infra; prompts versioned in git
 
 ### Tier 2 — Advanced
-- [ ] A2A protocol (signed Agent Card + peer coordination)
-- [ ] Plan-and-execute + replanning
+- [x] A2A protocol — signed Agent Card + JSON-RPC specialist endpoint (`kompass/a2a/`)
+- [x] Plan-and-execute + replanning — `TodoListMiddleware` with a Kompass planning prompt
 - [ ] Sandboxed code execution
-- [ ] Proactive / event-driven autonomy
+- [x] Proactive / event-driven autonomy — ticket webhook triaged unattended by the read-only Researcher (`kompass/triggers/`)
 - [ ] Self-improving loop (feedback → few-shots/memory)
 - [ ] User-simulator eval harness (τ-bench style)
 - [ ] Dedicated safety agent + prompt-injection red-team suite
 
 ### Tier 3 — Stretch
-- [ ] Multi-modal ingestion · Multi-agent debate · Saga/compensation · Semantic caching · Framework comparison spike
+- [x] **Framework comparison spike** — Researcher in PydanticAI, live parity run ([`spike_frameworks/comparison.md`](spike_frameworks/comparison.md))
+- [ ] Multi-modal ingestion · Multi-agent debate · Saga/compensation · Semantic caching
 
 ## Quickstart
 
