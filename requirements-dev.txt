@@ -1,0 +1,19 @@
+# Kompass — dev, test & evaluation dependencies.
+# Install:  python -m pip install -r requirements-dev.txt
+# (this also pulls in the runtime requirements below)
+
+-r requirements.txt
+
+# ── Testing & quality ─────────────────────────────────────────────────
+pytest>=8.3
+pytest-asyncio>=0.24
+ruff>=0.6
+
+# ── Evaluation harness ────────────────────────────────────────────────
+ragas>=0.2.0
+datasets>=3.0
+pandas>=2.2
+
+# ── Framework comparison spike (Tier 2/3, optional) ───────────────────
+# pydantic-ai>=0.0.14
+# openai-agents>=0.0.1

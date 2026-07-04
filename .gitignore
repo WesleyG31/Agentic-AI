@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# Env & secrets
+.env
+.env.local
+*.key
+
+# Data artifacts (reproducible via `make seed`)
+corpus/acme.db
+.chroma/
+*.sqlite
+*.sqlite3
+kompass_checkpoints.db
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Eval outputs (regenerated via `make evals`)
+evals/results/
+evals/*.csv
+
+# Langfuse / docker volumes
+.langfuse/
+pgdata/
+qdrant_storage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
