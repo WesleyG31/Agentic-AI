@@ -1,0 +1,7 @@
+.venv
+.git
+.chroma
+*.db*
+runs.jsonl
+__pycache__
+evals/results

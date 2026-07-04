@@ -10,11 +10,14 @@ entirely — via the shared thread_id.
 Run:  uvicorn kompass.api.app:app --port 8000   (or `make api`)
 """
 
+import json
 from contextlib import asynccontextmanager
 from typing import Literal
 from uuid import uuid4
 
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessageChunk
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from pydantic import BaseModel
@@ -86,6 +89,38 @@ async def chat(req: ChatRequest) -> dict:
     thread_id = req.thread_id or uuid4().hex
     state = await app.state.agent.ainvoke({"messages": [("user", req.message)]}, _config(thread_id))
     return _run_response(thread_id, state)
+
+
+@app.post("/chat/stream")
+async def chat_stream(req: ChatRequest) -> StreamingResponse:
+    """Streaming variant of /chat: SSE with a {"delta": ...} event per AI text
+    chunk, then a final {"done": true, ...} event carrying the run outcome.
+    If the run pauses for approval, the final event says awaiting_approval."""
+    thread_id = req.thread_id or uuid4().hex
+
+    async def events():
+        async for chunk, meta in app.state.agent.astream(
+            {"messages": [("user", req.message)]}, _config(thread_id), stream_mode="messages"
+        ):
+            # Only the main model's text reaches the client — tool results and
+            # the critic's structured review also flow through this stream.
+            if (
+                meta.get("langgraph_node") == "model"
+                and isinstance(chunk, AIMessageChunk)
+                and chunk.text
+            ):
+                yield f"data: {json.dumps({'delta': chunk.text})}\n\n"
+        snapshot = await app.state.agent.aget_state(_config(thread_id))
+        run = _run_response(thread_id, {**snapshot.values, "__interrupt__": snapshot.interrupts})
+        final = {
+            "done": True,
+            "thread_id": thread_id,
+            "status": run["status"],
+            "pending_actions": run["pending_actions"],
+        }
+        yield f"data: {json.dumps(final)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 @app.post("/resume")

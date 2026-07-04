@@ -11,6 +11,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.language_models.chat_models import BaseChatModel
 
 from kompass.config import settings
+from kompass.obs import TraceHandler
 
 Tier = Literal["fast", "balanced", "reasoning"]
 
@@ -18,10 +19,19 @@ Tier = Literal["fast", "balanced", "reasoning"]
 @lru_cache
 def pick(tier: Tier) -> BaseChatModel:
     """Return the chat model for a tier: fast (routing/classification),
-    balanced (drafting/synthesis), reasoning (hard planning/verification)."""
+    balanced (drafting/synthesis), reasoning (hard planning/verification).
+
+    Every model carries the local trace handler (runs.jsonl), plus the
+    Langfuse handler when LANGFUSE_ENABLED is set (langfuse is an optional
+    extra — imported only inside the branch)."""
     spec = {
         "fast": settings.model_fast,
         "balanced": settings.model_balanced,
         "reasoning": settings.model_reasoning,
     }[tier]
-    return init_chat_model(spec)
+    callbacks: list = [TraceHandler()]
+    if settings.langfuse_enabled:
+        from langfuse.langchain import CallbackHandler
+
+        callbacks.append(CallbackHandler())
+    return init_chat_model(spec, callbacks=callbacks)

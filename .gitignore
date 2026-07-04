@@ -32,6 +32,9 @@ kompass_checkpoints.db*
 evals/results/
 evals/*.csv
 
+# Local LLM traces (kompass/obs.py)
+runs.jsonl
+
 # Langfuse / docker volumes
 .langfuse/
 pgdata/
