@@ -11,6 +11,7 @@ pulling the relevant subgraph and grounding it in the cited source sections.
 """
 
 import json
+import re
 from functools import lru_cache
 
 import networkx as nx
@@ -22,6 +23,11 @@ from kompass.retrieval import rag
 
 GRAPH_PATH = ROOT / "corpus" / "graph.json"
 
+# Function words dropped before matching query terms to node names, so seeds hinge on
+# content words (policies, roles, amounts) rather than connectors.
+STOP = {"the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "with", "over",
+        "under", "per", "who", "what", "is", "are", "its", "from", "by", "at", "as", "it"}
+
 EXTRACT = """Extract a concept graph from one ACME GmbH policy/FAQ document as \
 subject-relation-object triples. Entities are policies, rules, monetary thresholds, \
 roles, and deadlines; relations are short labels like requires, approved_by, within, \
@@ -29,8 +35,10 @@ refunded_to, applies_to, cross_references. Keep entity names short and canonical
 (e.g. "refund over €500", "supervisor", "5-10 business days", "damaged item"). Emit \
 every relation the document states; prefer many precise triples over few vague ones."""
 
-QUERY_ENTITIES = """List the key entities in this question — the policies, rules, \
-monetary thresholds, roles, and deadlines it asks about — as short noun phrases."""
+QUERY_ENTITIES = """List the key entities this question is about — the policies, rules, \
+roles, monetary thresholds, and deadlines — as short canonical noun phrases. Write euro \
+amounts with the € symbol (e.g. "€500") and name the specific role where implied \
+(e.g. "supervisor"). One entity per item, no explanations."""
 
 
 class Triple(BaseModel):
@@ -49,6 +57,11 @@ class Entities(BaseModel):
     """The key entities named in a query."""
 
     entities: list[str]
+
+
+def _tokens(text: str) -> set[str]:
+    """Content words of a phrase (lowercased, € kept) minus function words."""
+    return set(re.findall(r"[a-z0-9€]+", text.lower())) - STOP
 
 
 def _build_from_rows(rows: list[dict]) -> nx.DiGraph:
@@ -88,10 +101,11 @@ def _graph() -> nx.DiGraph:
 def search(question: str, k: int = 4) -> str:
     """Answer a multi-hop question from the concept graph.
 
-    A fast LLM names the query's key entities; we match them to graph nodes
-    (case-insensitive substring), pull the radius-2 neighborhood subgraph, and return its
-    triples plus the grounding source sections (fetched via rag.search) tagged with
-    citations — the same context shape the other strategies produce.
+    A fast LLM names the query's key entities; we match their content words to graph nodes
+    (case-insensitive), pull the radius-1 neighborhood of every matched entity, and return
+    that subgraph's triples plus the grounding source sections (fetched via rag.search)
+    tagged with citations — the same context shape the other strategies produce. Because
+    several entities are seeded at once, their neighborhoods union into the multi-hop chain.
     """
     g = _graph()
     named: Entities = (
@@ -99,29 +113,19 @@ def search(question: str, k: int = 4) -> str:
         .with_structured_output(Entities)
         .invoke([("system", QUERY_ENTITIES), ("user", question)])
     )
-    seeds = list(
-        dict.fromkeys(
-            n
-            for n in g.nodes
-            for e in named.entities
-            if e.lower() in n.lower() or n.lower() in e.lower()
-        )
-    )
+    qterms = _tokens(" ".join(named.entities))
+    seeds = {n for n in g.nodes if _tokens(n) & qterms}
 
-    # Walk the undirected view so relations chain in both directions (radius 2 = multi-hop).
-    ug = g.to_undirected()
-    reach: set[str] = set(seeds)
-    for s in seeds:
-        reach |= set(nx.single_source_shortest_path_length(ug, s, cutoff=2))
-
-    sub = g.subgraph(reach)
+    # Radius-1 neighborhood: every relation asserted about a matched entity.
+    sub = g.edge_subgraph((u, v) for u, v in g.edges if u in seeds or v in seeds)
     triples = "\n".join(
-        f"{u} --{d['relation']}--> {v}   (from {d['source']})" for u, v, d in sub.edges(data=True)
+        f"{u} --{d['relation']}--> {v}   (from {d['source']})"
+        for u, v, d in sorted(sub.edges(data=True), key=lambda e: (e[2]["source"], e[0]))
     )
     sources = sorted({d["source"] for _, _, d in sub.edges(data=True)})
     grounding = "\n\n".join(f"{c.citation}\n{c.text}" for c in rag.search(question, k=k))
 
     return (
-        f"Concept subgraph ({sub.number_of_edges()} relations across {len(sources)} documents "
-        f"{sources}):\n{triples}\n\nGrounding sections:\n{grounding}"
+        f"Concept subgraph ({sub.number_of_edges()} relations across {len(sources)} "
+        f"documents {sources}):\n{triples}\n\nGrounding sections:\n{grounding}"
     )

@@ -49,3 +49,6 @@ kompass_memory.db
 
 # GraphRAG build artifact (reproducible via build_graph)
 corpus/graph.json
+
+# Self-improving lessons store (rebuilt at runtime)
+kompass_lessons.db

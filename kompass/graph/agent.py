@@ -20,6 +20,7 @@ from kompass.config import ROOT, settings
 from kompass.graph.critic import GroundingCritic
 from kompass.graph.workers import research
 from kompass.guardrails.safety import SafetyMiddleware
+from kompass.memory.lessons import LessonsMiddleware
 from kompass.memory.store import recall_memories, save_memory
 from kompass.models.router import pick
 from kompass.retrieval.nl2sql import SCHEMA
@@ -116,6 +117,9 @@ async def build_agent(checkpointer, mode: str | None = None):
             # The default prompt is too reluctant for support work, hence the override.
             TodoListMiddleware(system_prompt=PLANNING_PROMPT),
             GroundingCritic(),
+            # Prime the run with lessons from past resolutions, and distill a new one
+            # once this run resolves — self-improvement that never alters control flow.
+            LessonsMiddleware(),
             HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON),
         ],
         checkpointer=checkpointer,
