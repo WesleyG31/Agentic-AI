@@ -4,6 +4,10 @@ Reads are free (search_docs, query_database, get_ticket); writes (create_refund,
 update_ticket) pause at the HumanInTheLoop middleware for an approve/edit/reject
 decision. State is checkpointed in SQLite, so a paused run survives restarts and
 can be resumed by any surface (demo script, API, UI) via the same thread_id.
+
+In "multi" mode the agent becomes a supervisor: reads are delegated to the
+Researcher worker (kompass/graph/workers.py) via the `research` tool, while the
+write tools — and the HITL gate — stay here.
 """
 
 import sys
@@ -12,13 +16,14 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import HumanInTheLoopMiddleware
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from kompass.config import ROOT
+from kompass.config import ROOT, settings
 from kompass.graph.critic import GroundingCritic
+from kompass.graph.workers import research
 from kompass.memory.store import recall_memories, save_memory
 from kompass.models.router import pick
 from kompass.retrieval.nl2sql import SCHEMA
 
-SYSTEM_PROMPT = f"""You are Kompass, ACME GmbH's support & operations assistant. \
+SYSTEM_PROMPT = """You are Kompass, ACME GmbH's support & operations assistant. \
 Today is 2026-07-04.
 
 You resolve requests end-to-end: answer questions about policies and operational data, and
@@ -27,9 +32,7 @@ execute actions (refunds, ticket updates) when justified.
 Rules:
 - Ground every factual claim in tool results. Cite sources inline exactly as returned, e.g.
   [policies/refund_policy.md § Damaged or Defective Items] for documents, or the SQL you ran.
-- search_docs answers policy/FAQ questions. query_database answers questions about orders,
-  order_items, tickets, employees, refunds — one SELECT per call, schema:
-{SCHEMA}
+{research_rule}
 - Before any action, verify the facts: fetch the order/ticket, check the relevant policy
   (return window, refund conditions), and only then call the action tool.
 - create_refund and update_ticket are gated: calling them pauses the run and a human
@@ -41,6 +44,15 @@ Rules:
   they state a durable preference or standing instruction worth keeping across conversations.
 - If a request cannot be resolved with your tools, say what is missing and escalate;
   never invent data or promise actions you cannot perform."""
+
+RESEARCH_RULES = {
+    "single": f"""\
+- search_docs answers policy/FAQ questions. query_database answers questions about orders,
+  order_items, tickets, employees, refunds — one SELECT per call, schema:
+{SCHEMA}""",
+    "multi": "- Delegate all policy/data research to the research tool; act only on evidence "
+    "it returns.",
+}
 
 INTERRUPT_ON = {
     "create_refund": {"allowed_decisions": ["approve", "edit", "reject"]},
@@ -68,13 +80,20 @@ def mcp_client() -> MultiServerMCPClient:
     )
 
 
-async def build_agent(checkpointer):
-    """Assemble the agent: balanced model + MCP and memory tools + critic + HITL gate."""
-    tools = await mcp_client().get_tools() + [save_memory, recall_memories]
+async def build_agent(checkpointer, mode: str | None = None):
+    """Assemble the agent: balanced model + MCP and memory tools + critic + HITL gate.
+
+    mode "single" (default): all tools wired directly. mode "multi": reads go through
+    the `research` worker; only the ticketing tools stay here, behind the HITL gate."""
+    mode = mode or settings.agent_mode
+    if mode == "multi":
+        tools = [research, *await mcp_client().get_tools(server_name="ticketing")]
+    else:
+        tools = await mcp_client().get_tools()
     return create_agent(
         model=pick("balanced"),
-        tools=tools,
-        system_prompt=SYSTEM_PROMPT,
+        tools=tools + [save_memory, recall_memories],
+        system_prompt=SYSTEM_PROMPT.format(research_rule=RESEARCH_RULES[mode]),
         middleware=[
             GroundingCritic(),
             HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON),

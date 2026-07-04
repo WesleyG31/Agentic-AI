@@ -64,17 +64,17 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 
 ### Tier 1 — Core
 - [x] Adaptive retrieval (RAG hybrid + CAG + NL2SQL, router per query) — *GraphRAG pending*
-- [ ] Orchestration / planning (supervisor + routing) — *single-agent tool orchestration live; supervisor pending*
-- [ ] Multi-agent workers (+ single-agent mode)
+- [x] Orchestration / planning — *supervisor mode live (`KOMPASS_AGENT_MODE=multi`); explicit planner is Tier 2*
+- [x] Multi-agent workers (+ single-agent mode) — *Researcher worker; writes + HITL stay at the supervisor*
 - [x] Tool use via **MCP** (doc-search, sql, ticketing servers over stdio)
-- [ ] Memory — *short-term (per-thread checkpointer) live; long-term per-user store pending*
-- [ ] Reflection / self-correction (grounding check)
+- [x] Memory — short-term (per-thread checkpointer) + long-term per-user store (`save_memory`/`recall_memories`, cross-thread)
+- [x] Reflection / self-correction — `GroundingCritic` middleware: final answers reviewed vs tool evidence, one bounded retry
 - [x] **Human-in-the-loop** declarative + durable + resumable (HITL middleware, verified live)
-- [ ] Guardrails — *citations, read-only SQL boundary, arg validation live; injection/PII pending*
-- [ ] Streaming + observability (Langfuse)
-- [ ] Evaluation (golden set + RAGAS-style judge metrics + task-completion + value metrics + baseline)
+- [ ] Guardrails — *citations, read-only SQL boundary, arg validation, injection-refusal measured in evals; dedicated safety agent is Tier 2*
+- [x] Streaming + observability — SSE `/chat/stream` + per-call JSONL tracing (`runs.jsonl`); Langfuse behind `LANGFUSE_ENABLED`
+- [x] Evaluation — 35-item golden set + LLM judge + naïve-RAG baseline + value metrics + CI regression gate (live table above)
 - [x] Model routing (fast/balanced/reasoning tiers via config) — *token budgets pending*
-- [ ] Deploy/MLOps — *CI + compose infra live; Dockerfile + versioned prompts pending*
+- [x] Deploy/MLOps — Dockerfile (288 MB) + CI + compose infra; prompts versioned in git
 
 ### Tier 2 — Advanced
 - [ ] A2A protocol (signed Agent Card + peer coordination)

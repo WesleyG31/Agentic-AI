@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     model_balanced: str = Field(default="openai:gpt-5.4", alias="KOMPASS_MODEL_BALANCED")
     model_fast: str = Field(default="openai:gpt-5.4-nano", alias="KOMPASS_MODEL_FAST")
 
+    # ── Agent ─────────────────────────────────────────────────────────
+    # single = one agent with all tools; multi = supervisor delegates research
+    # to a worker agent, keeping the write tools (and HITL gate) to itself.
+    agent_mode: str = Field(default="single", alias="KOMPASS_AGENT_MODE")
+
     # ── Retrieval ─────────────────────────────────────────────────────
     vector_backend: str = Field(default="chroma", alias="KOMPASS_VECTOR_BACKEND")
     chroma_path: str = Field(default=".chroma", alias="KOMPASS_CHROMA_PATH")
