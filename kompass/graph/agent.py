@@ -13,6 +13,8 @@ from langchain.agents.middleware import HumanInTheLoopMiddleware
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from kompass.config import ROOT
+from kompass.graph.critic import GroundingCritic
+from kompass.memory.store import recall_memories, save_memory
 from kompass.models.router import pick
 from kompass.retrieval.nl2sql import SCHEMA
 
@@ -35,6 +37,8 @@ Rules:
   confirmation step — never ask the user for confirmation in chat; call the tool directly
   once the facts check out.
 - Refunds over €500 require supervisor approval — state this in the refund reason.
+- Memory: when a user identifies themselves, recall_memories for them; save_memory when
+  they state a durable preference or standing instruction worth keeping across conversations.
 - If a request cannot be resolved with your tools, say what is missing and escalate;
   never invent data or promise actions you cannot perform."""
 
@@ -65,12 +69,15 @@ def mcp_client() -> MultiServerMCPClient:
 
 
 async def build_agent(checkpointer):
-    """Assemble the agent: balanced model + MCP tools + HITL gate + durable state."""
-    tools = await mcp_client().get_tools()
+    """Assemble the agent: balanced model + MCP and memory tools + critic + HITL gate."""
+    tools = await mcp_client().get_tools() + [save_memory, recall_memories]
     return create_agent(
         model=pick("balanced"),
         tools=tools,
         system_prompt=SYSTEM_PROMPT,
-        middleware=[HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON)],
+        middleware=[
+            GroundingCritic(),
+            HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON),
+        ],
         checkpointer=checkpointer,
     )
