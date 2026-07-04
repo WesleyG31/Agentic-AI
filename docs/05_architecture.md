@@ -128,7 +128,7 @@ Capabilities are grouped so the project can be **shipped and defended incrementa
 - [ ] **Human-in-the-loop** — **declarative + durable + resumable** approve/edit/reject gate on risky actions. → [04](04_hitl_patterns.md)
 - [ ] **Guardrails** — grounding + mandatory citations, prompt-injection defence, PII/GDPR handling, permissions, **typed (Pydantic) outputs**.
 - [ ] **Streaming + observability** — token/step streaming to the UI; full tracing in **Langfuse**.
-- [ ] **Evaluation** — golden set + RAGAS (faithfulness/relevance) + task-completion + **business-value metrics** + a baseline + **CI regression gate**.
+- [ ] **Evaluation** — golden set + RAGAS-style judge metrics (faithfulness/correctness) + task-completion + **business-value metrics** + a baseline + **CI regression gate**.
 - [ ] **Model routing + caching + token budgets** — cheap model for routing, strong model for reasoning; prompt caching; hard budget caps.
 - [ ] **Deploy / MLOps** — Docker, CI/CD, versioned prompts, durable (Postgres) checkpointer.
 
@@ -294,7 +294,7 @@ kompass/
 │   ├── api/         → FastAPI: /chat · /resume · /runs/{id}                          [T1 serving surface]
 │   └── scripts/     → seed + demo (make seed / make demo)                            [reproducibility]
 ├── spike_frameworks/→ one worker re-implemented in a 2nd framework + comparison.md   [T3 framework spike]
-├── evals/           → golden set · RAGAS · task-completion · value metrics · baseline[T1 evaluation]
+├── evals/           → golden set · judge metrics · task-completion · value metrics · baseline[T1 evaluation]
 │   └── user_simulator/ → τ-bench-style simulated-user harness                        [T2 eval harness]
 ├── ui/              → Streamlit chat + HITL card                                     [T1 streaming UI]
 ├── tests/           → unit + smoke                                                   [T1 CI]

@@ -10,9 +10,9 @@ pytest-asyncio>=0.24
 ruff>=0.6
 
 # ── Evaluation harness ────────────────────────────────────────────────
-ragas>=0.2.0
-datasets>=3.0
-pandas>=2.2
+# Metrics are computed by a transparent LLM-as-judge rubric (evals/judge.py)
+# rather than the ragas package, which is incompatible with langchain 1.x.
+# No extra dependencies needed beyond the runtime set.
 
 # ── Framework comparison spike (Tier 2/3, optional) ───────────────────
 # pydantic-ai>=0.0.14

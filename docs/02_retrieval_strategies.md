@@ -234,7 +234,7 @@ The choice to build this on LangGraph rather than a hand-rolled loop — a graph
 
 ## 7. Measuring retrieval quality (the evaluation angle)
 
-You cannot claim "beyond RAG" without proving each backend actually grounds the answer. Kompass evaluates retrieval with the **RAGAS** metric family, which separates *retrieval* quality from *generation* faithfulness:
+You cannot claim "beyond RAG" without proving each backend actually grounds the answer. Kompass evaluates retrieval with the **RAGAS metric family** (implemented as a transparent LLM-as-judge rubric in `evals/judge.py` — the ragas package predates langchain 1.x), which separates *retrieval* quality from *generation* faithfulness:
 
 | Metric | Question it answers | What a bad score tells you |
 |---|---|---|
