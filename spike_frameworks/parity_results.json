@@ -1,0 +1,196 @@
+{
+  "date": "2026-07-04",
+  "model": "openai:gpt-5.4",
+  "items": {
+    "rag-01": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes all required facts (28 days, carry over up to 5 days, use by March 31) and supports the factual claims with cited sources.",
+        "answer": "Full-time employees get 28 vacation days per calendar year [faq/employee_faq.md § How many vacation days do I get per year?] [policies/vacation_policy.md § Annual Leave Entitlement].\n\nIf you don’t use them all, you can carry over up to 5 days into the next calendar year [faq/employee_faq.md § Can I carry unused vacation days into the next year?] [policies/vacation_policy.md § Carry-Over Rule].\n\nThose carried-over days must be used by March 31 of the new year; after that, they expire without compensation [faq/employee_faq.md § Can I carry unused vacation days into the next year?] [policies/vacation_policy.md § Carry-Over Rule].\n\nAlso, any unused days above the 5-day carry-over limit are forfeited at year end [policies/vacation_policy.md § Carry-Over Rule].",
+        "latency_s": 11.1,
+        "tokens": 1745,
+        "cost_usd": 0.0072
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes all expected facts (28 days, carry over up to 5, used by March 31) and supports its factual claims with citations.",
+        "answer": "Full-time employees get 28 vacation days per calendar year [policies/vacation_policy.md § Annual Leave Entitlement] [faq/employee_faq.md § How many vacation days do I get per year?].\n\nIf you do not use them all, you can carry over up to 5 unused days into the next calendar year [policies/vacation_policy.md § Carry-Over Rule] [faq/employee_faq.md § Can I carry unused vacation days into the next year?].\n\nThose carried-over days must be used by March 31 of the new year, otherwise they expire without compensation [policies/vacation_policy.md § Carry-Over Rule] [faq/employee_faq.md § Can I carry unused vacation days into the next year?].\n\nPart-time staff receive a pro-rated entitlement [policies/vacation_policy.md § Annual Leave Entitlement] [faq/employee_faq.md § How many vacation days do I get per year?].",
+        "latency_s": 5.0,
+        "tokens": 1517,
+        "cost_usd": 0.0067
+      }
+    },
+    "rag-02": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer states the required 30-day return window after delivery and supports the claims with cited policy/FAQ sources.",
+        "answer": "Customers can return an item for a refund within 30 days from the delivery date, not the order date [policies/refund_policy.md § Return Window] [faq/customer_faq.md § What is your return window?]. For change-of-mind returns, the same 30-day window applies [policies/refund_policy.md § Change-of-Mind Returns].",
+        "latency_s": 5.3,
+        "tokens": 1582,
+        "cost_usd": 0.0053
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes the required 30-day return window and supports its factual claims with cited policy/FAQ sources.",
+        "answer": "Customers can return an item for a refund within 30 days from the delivery date, and the carrier-confirmed delivery date is the authoritative start of that window [policies/refund_policy.md § Return Window]. The FAQ states the same: returns are allowed within 30 days of the delivery date, not the order date [faq/customer_faq.md § What is your return window?].",
+        "latency_s": 3.1,
+        "tokens": 1316,
+        "cost_usd": 0.0047
+      }
+    },
+    "rag-03": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes full refund and shipping coverage for damaged items, with all factual claims supported by cited policy/FAQ sections.",
+        "answer": "Under ACME’s policy, if an item arrives damaged or defective, the customer is entitled to a full refund including shipping costs [policies/refund_policy.md § Damaged or Defective Items]. They do not pay return shipping; a prepaid return label is issued [policies/refund_policy.md § Damaged or Defective Items]. If they prefer, a replacement may be offered at no additional cost, subject to stock availability [policies/refund_policy.md § Damaged or Defective Items].\n\nCustomers should contact support with their order number and, if possible, photos of the damage [faq/customer_faq.md § My item arrived damaged or defective. What happens now?]. Support agents are instructed to ask for photos of the damage and packaging where practical, attach them to the ticket, and record the damage report against the order [policies/refund_policy.md § Damaged or Defective Items].",
+        "latency_s": 6.3,
+        "tokens": 1704,
+        "cost_usd": 0.007
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes the required full refund and shipping entitlement for a damaged rag, and all stated policy details are accompanied by citations.",
+        "answer": "Under ACME policy, a customer whose item arrived damaged is entitled to:\n\n- a **full refund, including shipping costs** [policies/refund_policy.md § Damaged or Defective Items]\n- **no return shipping charge**; ACME issues a **prepaid return label** [policies/refund_policy.md § Damaged or Defective Items]\n- potentially a **replacement at no additional cost**, if they prefer that and stock is available [policies/refund_policy.md § Damaged or Defective Items]\n\nThey should contact support with the **order number** and, where practical, **photos of the damage and packaging** [faq/customer_faq.md § My item arrived damaged or defective. What happens now?] [policies/refund_policy.md § Damaged or Defective Items]",
+        "latency_s": 3.9,
+        "tokens": 1422,
+        "cost_usd": 0.0061
+      }
+    },
+    "rag-04": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes the €500 threshold and supervisor approval, with cited support for all factual claims.",
+        "answer": "Refunds over €500 need extra approval, and that approval must come from a supervisor [policies/refund_policy.md § Approval Thresholds]. The same threshold is confirmed in the customer FAQ: “Refunds over €500 require supervisor approval before they can be processed” [faq/customer_faq.md § Why is my larger refund taking a little longer to approve?].\n\nAlso, any deviation from policy, such as goodwill refunds or out-of-window exceptions, requires supervisor approval regardless of amount [policies/refund_policy.md § Approval Thresholds].",
+        "latency_s": 6.1,
+        "tokens": 1717,
+        "cost_usd": 0.0061
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer states refunds over €500 require approval by a supervisor and cites the policy for its factual claims.",
+        "answer": "Refunds **over €500** need extra approval, and the approver must be a **supervisor** [policies/refund_policy.md § Approval Thresholds]. The same section also says **any deviation from policy** (for example, goodwill or out-of-window refunds) requires supervisor approval **regardless of amount** [policies/refund_policy.md § Approval Thresholds].",
+        "latency_s": 3.7,
+        "tokens": 1375,
+        "cost_usd": 0.0048
+      }
+    },
+    "rag-05": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes all required prices (4.95, 9.95, 12.95) with shipping times and cites sources for each factual claim.",
+        "answer": "ACME offers three shipping options:\n\n- Standard shipping within Germany: 3–5 business days, €4.95. It’s free for orders over €50 after discounts, before shipping [policies/shipping_policy.md § Shipping Options and Rates] [policies/shipping_policy.md § Free-Shipping Threshold]\n- Express shipping within Germany: 1–2 business days, €9.95 [policies/shipping_policy.md § Shipping Options and Rates]\n- EU shipping to other EU member states: 5–8 business days, €12.95 [policies/shipping_policy.md § Shipping Options and Rates] [faq/customer_faq.md § Do you ship to other EU countries?]\n\nTiming details:\n- Delivery times are in business days, Monday to Friday, excluding German public holidays, and start when the parcel is handed to the carrier, not from the order date [policies/shipping_policy.md § Shipping Options and Rates]\n- Orders placed before 14:00 CET on a business day are normally handed to the carrier the same day [policies/shipping_policy.md § Shipping Options and Rates]",
+        "latency_s": 6.4,
+        "tokens": 1872,
+        "cost_usd": 0.0079
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes all expected prices (4.95, 9.95, 12.95), matching shipping options, costs, times, and cites the shipping policy for each factual claim.",
+        "answer": "We offer three shipping options:\n\n- **Standard shipping (Germany):** **€4.95**, or **free for orders over €50**; delivery in **3–5 business days** [policies/shipping_policy.md § Shipping Options and Rates]\n- **Express shipping (Germany):** **€9.95**; delivery in **1–2 business days** [policies/shipping_policy.md § Shipping Options and Rates]\n- **EU shipping (other EU member states):** **€12.95**; delivery in **5–8 business days** [policies/shipping_policy.md § Shipping Options and Rates]\n\nTiming notes:\n- Delivery times are measured in **business days only (Monday–Friday, excluding German public holidays)** and start **from when the parcel is handed to the carrier, not the order date** [policies/shipping_policy.md § Shipping Options and Rates]\n- Orders placed **before 14:00 CET on a business day** are **normally handed to the carrier the same day** [policies/shipping_policy.md § Shipping Options and Rates]",
+        "latency_s": 4.3,
+        "tokens": 1464,
+        "cost_usd": 0.0068
+      }
+    },
+    "sql-01": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes the required remaining vacation days (17) and supports the calculation with the shown SQL query.",
+        "answer": "Jonas Weber has 17 vacation days left this year (28 total minus 11 used) [SELECT name, vacation_days_total, vacation_days_used, (vacation_days_total - vacation_days_used) AS vacation_days_left FROM employees WHERE name = 'Jonas Weber';].",
+        "latency_s": 4.3,
+        "tokens": 1243,
+        "cost_usd": 0.0045
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes the required fact (17) and supports it with the shown SQL query and calculation.",
+        "answer": "Jonas Weber has **17 vacation days left** this year, based on **28 total** minus **11 used** (`SELECT name, vacation_days_total, vacation_days_used, (vacation_days_total - vacation_days_used) AS vacation_days_left FROM employees WHERE name = 'Jonas Weber';`).",
+        "latency_s": 2.3,
+        "tokens": 1023,
+        "cost_usd": 0.004
+      }
+    },
+    "sql-02": {
+      "langgraph": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes both expected facts (delivered and 129.98) and supports them with the shown SQL query.",
+        "answer": "Order 4464 is currently **delivered** and the total amount is **€129.98** [SELECT status, total_eur FROM orders WHERE id = 4464;].",
+        "latency_s": 5.8,
+        "tokens": 1169,
+        "cost_usd": 0.0038
+      },
+      "pydantic_ai": {
+        "correct": true,
+        "grounded": true,
+        "cited": true,
+        "facts_strict": true,
+        "notes": "The answer includes both expected facts (delivered and €129.98) and supports them with the shown SQL query.",
+        "answer": "Order 4464 is currently **delivered** and its total amount is **€129.98** (`SELECT id, status, total_eur FROM orders WHERE id = 4464;`).",
+        "latency_s": 2.6,
+        "tokens": 957,
+        "cost_usd": 0.0034
+      }
+    }
+  },
+  "aggregate": {
+    "langgraph": {
+      "n": 7,
+      "correct": 1.0,
+      "grounded": 1.0,
+      "cited": 1.0,
+      "facts_strict": 1.0,
+      "mean_latency_s": 6.5,
+      "mean_tokens": 1576,
+      "mean_cost_usd": 0.006
+    },
+    "pydantic_ai": {
+      "n": 7,
+      "correct": 1.0,
+      "grounded": 1.0,
+      "cited": 1.0,
+      "facts_strict": 1.0,
+      "mean_latency_s": 3.6,
+      "mean_tokens": 1296,
+      "mean_cost_usd": 0.0052
+    }
+  }
+}

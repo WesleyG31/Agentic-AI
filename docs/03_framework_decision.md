@@ -131,7 +131,7 @@ a second framework (**PydanticAI**, with OpenAI Agents SDK as the alternate) and
 Researcher is the right choice for the spike because its job ("retrieve, reason over context, return a
 *validated* structured answer") is exactly PydanticAI's sweet spot, so the comparison is fair rather than
 rigged. The full write-up lives in
-[`../spike_frameworks/comparison.md`](../spike_frameworks/comparison.md) *(produced in a later slice)*; the
+[`../spike_frameworks/comparison.md`](../spike_frameworks/comparison.md) *(completed — live parity run 2026-07-04)*; the
 headline trade-off:
 
 | Dimension | LangGraph v1.0 | PydanticAI (spike) |
@@ -255,6 +255,6 @@ changed* between the version I shipped on and the version Kompass targets.
 - [`05_architecture.md`](05_architecture.md) — how the graph, checkpointer, and HITL gates fit the system.
 - [`06_advanced_patterns.md`](06_advanced_patterns.md) — multi-agent orchestration, subgraphs, durability.
 - [`../spike_frameworks/comparison.md`](../spike_frameworks/comparison.md) — the Researcher-agent framework
-  spike and trade-off table *(produced in a later slice)*.
+  spike and trade-off table *(completed — live parity run 2026-07-04)*.
 - [`../entrevista/framework_PACTEDR.md`](../entrevista/framework_PACTEDR.md) — interview framework for
   narrating this decision under pressure.

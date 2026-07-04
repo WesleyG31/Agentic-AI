@@ -14,6 +14,7 @@ ruff>=0.6
 # rather than the ragas package, which is incompatible with langchain 1.x.
 # No extra dependencies needed beyond the runtime set.
 
-# ── Framework comparison spike (Tier 2/3, optional) ───────────────────
-# pydantic-ai>=0.0.14
-# openai-agents>=0.0.1
+# ── Framework comparison spike ────────────────────────────────────────
+# PydanticAI researcher (spike_frameworks/): slim core + OpenAI provider only,
+# which keeps the dependency footprint honest for the comparison.
+pydantic-ai-slim[openai]>=2.5
