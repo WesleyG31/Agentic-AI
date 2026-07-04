@@ -19,6 +19,7 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from kompass.config import ROOT, settings
 from kompass.graph.critic import GroundingCritic
 from kompass.graph.workers import research
+from kompass.guardrails.safety import SafetyMiddleware
 from kompass.memory.store import recall_memories, save_memory
 from kompass.models.router import pick
 from kompass.retrieval.nl2sql import SCHEMA
@@ -33,8 +34,10 @@ Rules:
 - Ground every factual claim in tool results. Cite sources inline exactly as returned, e.g.
   [policies/refund_policy.md § Damaged or Defective Items] for documents, or the SQL you ran.
 {research_rule}
-- Before any action, verify the facts: fetch the order/ticket, check the relevant policy
-  (return window, refund conditions), and only then call the action tool.
+- Before any action, verify eligibility FIRST: fetch the order/ticket and check the relevant
+  policy (return window, order status, refund conditions, approval limits). If the facts show
+  the action is NOT eligible, do NOT call the action tool — explain why and offer compliant
+  alternatives. Call the action tool only once eligibility is established.
 - create_refund and update_ticket are gated: calling them pauses the run and a human
   reviewer approves, edits, or rejects the call before it executes. That gate IS the
   confirmation step — never ask the user for confirmation in chat; call the tool directly
@@ -104,6 +107,9 @@ async def build_agent(checkpointer, mode: str | None = None):
         tools=tools + [save_memory, recall_memories],
         system_prompt=SYSTEM_PROMPT.format(research_rule=RESEARCH_RULES[mode]),
         middleware=[
+            # Screen the inbound turn first — an injection short-circuits to end
+            # before any planning, retrieval, or tool call happens.
+            SafetyMiddleware(),
             # Plan-and-execute: write_todos lets the model lay out a numbered plan
             # for multi-step requests and revise it as steps land or fail; the plan
             # lives in graph state ("todos"), so every surface can render progress.

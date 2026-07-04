@@ -18,6 +18,7 @@ python-dotenv>=1.0
 # ── Retrieval (local: Chroma + BM25; no Docker needed) ────────────────
 chromadb>=0.5.5
 rank-bm25>=0.2.2
+networkx>=3.3
 
 # ── Serving + UI ──────────────────────────────────────────────────────
 fastapi>=0.115

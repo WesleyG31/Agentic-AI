@@ -5,13 +5,14 @@ lives in the database. This is the programmatic entry point used by evals and th
 baseline; inside the agent the same trade-off is made by the model choosing tools.
 """
 
+import re
 from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from kompass.models.router import pick
-from kompass.retrieval import cag, rag
+from kompass.retrieval import cag, graphrag, rag
 from kompass.retrieval.nl2sql import SCHEMA, run_sql
 
 CLASSIFY = f"""Route a query over ACME GmbH's knowledge to a retrieval strategy:
@@ -19,13 +20,16 @@ CLASSIFY = f"""Route a query over ACME GmbH's knowledge to a retrieval strategy:
 Write ONE SQLite SELECT for this schema (dataset "today" is 2026-07-04):
 {SCHEMA}
 - rag: a specific question answered by a policy/FAQ section (rules, prices, deadlines).
+- graph: multi-hop/relational questions spanning multiple policies or roles — \
+process + approver + timeline chained together (e.g. "for a damaged item over €500, \
+what's the refund process, who approves it, and the payout timeline?").
 - cag: broad or multi-document questions ("summarize all policies", comparisons)."""
 
 
 class Route(BaseModel):
     """Retrieval routing decision."""
 
-    strategy: Literal["sql", "rag", "cag"]
+    strategy: Literal["sql", "rag", "graph", "cag"]
     sql: str | None = Field(default=None, description="the SELECT statement, iff strategy=sql")
 
 
@@ -57,6 +61,13 @@ def retrieve(query: str, k: int = 4) -> RetrievalResult:
             strategy="rag",
             context="\n\n".join(f"{c.citation}\n{c.text}" for c in chunks),
             citations=[c.citation for c in chunks],
+        )
+    if route.strategy == "graph":
+        context = graphrag.search(query, k=k)
+        return RetrievalResult(
+            strategy="graph",
+            context=context,
+            citations=list(dict.fromkeys(re.findall(r"\[[^\]]+\]", context))),
         )
     return RetrievalResult(
         strategy="cag",

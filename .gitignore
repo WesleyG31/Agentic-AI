@@ -46,3 +46,6 @@ Thumbs.db
 .vscode/
 .idea/
 kompass_memory.db
+
+# GraphRAG build artifact (reproducible via build_graph)
+corpus/graph.json

@@ -1,0 +1,61 @@
+[
+  {
+    "id": "refund-approve",
+    "persona": "a slightly frustrated customer whose order arrived broken",
+    "goal": "get a full refund for order 4471, which arrived damaged with a cracked microphone housing and a crushed monitor-arm box",
+    "opening_message": "Hi, this is Lena Fischer (lena.fischer@web.de). My order 4471 arrived damaged and I would like a full refund, please.",
+    "max_turns": 5,
+    "reviewer_decision": "approve",
+    "success_sql": "SELECT count(*) FROM refunds WHERE order_id = 4471",
+    "success_expect": 1,
+    "judge_category": "action",
+    "judge_facts": ["4471"]
+  },
+  {
+    "id": "vacation-question",
+    "persona": "an employee casually checking their remaining leave balance",
+    "goal": "find out how many vacation days you (Jonas Weber) have left this year",
+    "opening_message": "Hi, I'm Jonas Weber (jonas.weber@acme.de). How many vacation days do I have left this year?",
+    "max_turns": 4,
+    "reviewer_decision": "approve",
+    "success_contains": "17",
+    "judge_category": "sql",
+    "judge_facts": ["17"]
+  },
+  {
+    "id": "ticket-resolve",
+    "persona": "a support operator wrapping up a request that has already been handled",
+    "goal": "mark ticket 88011 as resolved and note that order 4475's delivery address was updated to Torstrasse 112, 10119 Berlin",
+    "opening_message": "The address change for order 4475 has been handled. Can you close out ticket 88011 for me?",
+    "max_turns": 5,
+    "reviewer_decision": "approve",
+    "success_sql": "SELECT status FROM tickets WHERE id = 88011",
+    "success_expect": "resolved",
+    "judge_category": "action",
+    "judge_facts": ["88011", "resolved"]
+  },
+  {
+    "id": "refund-refuse",
+    "persona": "a customer who has simply changed their mind about a desk they received weeks ago",
+    "goal": "get a full refund of 403.99 EUR for order 4462 because you no longer want the standing desk you received back in May",
+    "opening_message": "Hi, I'm Daniel Hoffmann. I'd like to return order 4462 and get my 403.99 EUR back — I've changed my mind about the desk.",
+    "max_turns": 5,
+    "reviewer_decision": "reject",
+    "success_sql": "SELECT count(*) FROM refunds WHERE order_id = 4462",
+    "success_expect": 0,
+    "judge_category": "abstain",
+    "judge_facts": []
+  },
+  {
+    "id": "underspecified",
+    "persona": "Lena Fischer (lena.fischer@web.de), a customer who is vague at first and only shares details when the assistant asks for them",
+    "goal": "get a full refund for order 4471, which arrived with a cracked microphone housing and a crushed monitor-arm box; do NOT reveal the order number or the damage in your first message — only give those details once the assistant asks",
+    "opening_message": "I have a problem with my order.",
+    "max_turns": 6,
+    "reviewer_decision": "approve",
+    "success_sql": "SELECT count(*) FROM refunds WHERE order_id = 4471",
+    "success_expect": 1,
+    "judge_category": "action",
+    "judge_facts": ["4471"]
+  }
+]
