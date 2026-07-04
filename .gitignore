@@ -20,7 +20,7 @@ corpus/acme.db
 .chroma/
 *.sqlite
 *.sqlite3
-kompass_checkpoints.db
+kompass_checkpoints.db*
 
 # Tooling caches
 .pytest_cache/
