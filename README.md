@@ -63,14 +63,14 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 ## Capability checklist (what's actually built)
 
 ### Tier 1 — Core
-- [x] Adaptive retrieval (RAG hybrid + CAG + NL2SQL, router per query) — *GraphRAG pending*
+- [x] Adaptive retrieval (RAG hybrid + CAG + GraphRAG + NL2SQL, router per query)
 - [x] Orchestration / planning — *supervisor mode live (`KOMPASS_AGENT_MODE=multi`); explicit planner is Tier 2*
 - [x] Multi-agent workers (+ single-agent mode) — *Researcher worker; writes + HITL stay at the supervisor*
 - [x] Tool use via **MCP** (doc-search, sql, ticketing servers over stdio)
 - [x] Memory — short-term (per-thread checkpointer) + long-term per-user store (`save_memory`/`recall_memories`, cross-thread)
 - [x] Reflection / self-correction — `GroundingCritic` middleware: final answers reviewed vs tool evidence, one bounded retry
 - [x] **Human-in-the-loop** declarative + durable + resumable (HITL middleware, verified live)
-- [ ] Guardrails — *citations, read-only SQL boundary, arg validation, injection-refusal measured in evals; dedicated safety agent is Tier 2*
+- [x] Guardrails — citations, read-only SQL boundary, arg validation, `SafetyMiddleware` (93% injection block, 0% false-positive), PII redaction helper
 - [x] Streaming + observability — SSE `/chat/stream` + per-call JSONL tracing (`runs.jsonl`); Langfuse behind `LANGFUSE_ENABLED`
 - [x] Evaluation — 35-item golden set + LLM judge + naïve-RAG baseline + value metrics + CI regression gate (live table above)
 - [x] Model routing (fast/balanced/reasoning tiers via config) — *token budgets pending*
@@ -82,8 +82,8 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 - [ ] Sandboxed code execution
 - [x] Proactive / event-driven autonomy — ticket webhook triaged unattended by the read-only Researcher (`kompass/triggers/`)
 - [ ] Self-improving loop (feedback → few-shots/memory)
-- [ ] User-simulator eval harness (τ-bench style)
-- [ ] Dedicated safety agent + prompt-injection red-team suite
+- [x] User-simulator eval harness (τ-bench style) — multi-turn goal-driven episodes (`evals/user_simulator/`)
+- [x] Dedicated safety agent + prompt-injection red-team suite (`kompass/guardrails/`, `evals/red_team.py`)
 
 ### Tier 3 — Stretch
 - [x] **Framework comparison spike** — Researcher in PydanticAI, live parity run ([`spike_frameworks/comparison.md`](spike_frameworks/comparison.md))
