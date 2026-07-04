@@ -15,8 +15,8 @@ def test_version():
 def test_settings_defaults():
     # Instantiate in isolation (ignore any local .env) to assert the defaults.
     s = Settings(_env_file=None)
-    assert s.model_reasoning == "claude-opus-4-8"
-    assert s.model_fast == "claude-haiku-4-5-20251001"
+    assert s.model_reasoning == "openai:gpt-5.5"
+    assert s.model_fast == "openai:gpt-5.4-nano"
     assert s.vector_backend == "chroma"
     assert s.checkpointer == "sqlite"
     assert s.api_port == 8000

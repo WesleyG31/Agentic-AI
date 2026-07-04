@@ -280,7 +280,7 @@ linking) so the README table can show the delta, not just the absolute number.
 
 | Concern | Choice | Rationale |
 |---|---|---|
-| **Model routing** | `haiku` for schema-linking + trivial lookups, `sonnet` for standard queries, `opus` for hard multi-join / repair | Most queries are easy; paying Opus rates for all of them is how you blow the $/query budget. |
+| **Model routing** | `gpt-5.4-nano` for schema-linking + trivial lookups, `gpt-5.4` for standard queries, `gpt-5.5` for hard multi-join / repair | Most queries are easy; paying GPT-5.5 rates for all of them is how you blow the $/query budget. |
 | **Data plane** | Dedicated **read-replica**, partitioned by year, indexes on `(district_id, occurred_at)` | Analytics never touches the OLTP primary; read-only is enforced at the role *and* the topology. |
 | **Durability** | **Postgres checkpointer** (SQLite locally) | HITL pauses survive restarts; a PII approval can sit for hours and resume cleanly via `Command(resume=...)`. |
 | **Observability** | **Langfuse** traces: question → schema slice → SQL → guardrail verdict → rows → decision | Every answer is fully reconstructable — essential for an auditable, PII-touching system. |

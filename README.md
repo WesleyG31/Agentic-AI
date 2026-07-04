@@ -92,7 +92,7 @@ python -m pip install -r requirements-dev.txt   # runtime + dev/eval
 # (runtime only: python -m pip install -r requirements.txt)
 
 # 2. Configure
-cp .env.example .env        # add your ANTHROPIC_API_KEY
+cp .env.example .env        # add your OPENAI_API_KEY
 
 # 3. Seed the reproducible ACME corpus (SQLite + local Chroma index)
 make seed                   # or: python -m kompass.scripts.seed

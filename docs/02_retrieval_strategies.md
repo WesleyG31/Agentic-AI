@@ -69,7 +69,7 @@ This is the highest-signal comparison in the whole space, because CAG (Cache-Aug
 
 **RAG** does work *at query time*: embed the query, search a vector index (+ BM25), fuse, rerank, then feed the top-k chunks to the model. The context the model sees is a small, query-specific slice.
 
-**CAG** does the work *once, up front*: it loads the **entire** corpus into the prompt, lets the provider prefill and **cache** it, and then answers every subsequent question against that already-processed prefix. There is no retriever, no index, no top-k, no reranker — the model simply "already has the whole book open." On Claude, this is prompt caching: the first request writes the cache; every later request with the same prefix reads it at a fraction of the price and skips the prefill latency.
+**CAG** does the work *once, up front*: it loads the **entire** corpus into the prompt, lets the provider prefill and **cache** it, and then answers every subsequent question against that already-processed prefix. There is no retriever, no index, no top-k, no reranker — the model simply "already has the whole book open." Mechanically, this is prompt caching: the first request writes the cache; every later request with the same prefix reads it at a fraction of the price and skips the prefill latency.
 
 ```
 RAG  (work per query)                     CAG  (work once, then reuse)
@@ -97,7 +97,7 @@ So CAG is only viable when the corpus is **stable** (rarely edited, so the cache
 
 ### 3.3 Corpus-size limits
 
-CAG is bounded by the context window. Modern Claude models expose a **1M-token** window (Opus 4.8, Sonnet 5) — Haiku 4.5 is 200K — so "the whole corpus" can be surprisingly large. But two ceilings bite before the hard token limit:
+CAG is bounded by the context window. Frontier models (GPT-5.x, Claude) expose **≥1M-token** windows — the cheap fast tiers are smaller — so "the whole corpus" can be surprisingly large. But two ceilings bite before the hard token limit:
 
 1. **Cost scales with prefix size on every write.** A 400K-token corpus is cheap to *read* (0.1×) but you eat that size at 1.25–2× on every (re)write and every cache miss. Big + volatile = worst case.
 2. **Recall degrades on very long contexts** ("lost in the middle"). Past a few hundred K tokens, a model's ability to use a fact buried mid-prompt drops — so a huge CAG prefix can *retrieve everything and use nothing*. RAG sidesteps this by only ever showing the model a tight, reranked slice.

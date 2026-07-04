@@ -157,9 +157,9 @@ Every choice is pinned in `kompass/config.py` and toggled by `.env`, so the same
 | Layer | Choice | Why | Local default → Prod |
 |---|---|---|---|
 | **Framework** | **LangGraph v1.0** (Oct 2025) | Graph orchestration + **declarative HITL middleware** on top of the dynamic `interrupt()` primitive + durable checkpointing. → [03](03_framework_decision.md) | — |
-| **Reasoning model** | **Claude Opus 4.8** (`claude-opus-4-8`) | Hardest planning / verification steps. | via model router |
-| **Balanced model** | **Claude Sonnet 5** (`claude-sonnet-5`) | Default drafting / synthesis. | via model router |
-| **Fast / routing model** | **Claude Haiku 4.5** (`claude-haiku-4-5`) | Cheap classification, the retrieval router, safety pre-screen → **model routing**. | via model router |
+| **Reasoning model** | **GPT-5.5** (`openai:gpt-5.5`) | Hardest planning / verification steps. | via model router |
+| **Balanced model** | **GPT-5.4** (`openai:gpt-5.4`) | Default drafting / synthesis. | via model router |
+| **Fast / routing model** | **GPT-5.4 nano** (`openai:gpt-5.4-nano`) | Cheap classification, the retrieval router, safety pre-screen → **model routing**. | via model router |
 | **Vector store** | **Chroma** (local) → **Qdrant** (prod) | Hybrid dense+sparse search + reranker. | `.chroma` → `qdrant:6333` |
 | **Graph retrieval** | **GraphRAG library** | Multi-hop relational questions (Tier 3-leaning). | — |
 | **Tools** | **Own MCP servers** — `doc_search`, `sql`, `ticketing` | Typed, swappable, permissioned tool contracts (vertical layer). | — |
@@ -181,7 +181,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.types import Command
 
 action_agent = create_agent(
-    model=router.pick("balanced"),               # Sonnet 5 for drafting
+    model=router.pick("balanced"),               # GPT-5.4 for drafting
     tools=[mcp.ticketing, mcp.payments],         # tools exposed over MCP
     middleware=[
         # Declarative gate: pause BEFORE any side-effecting tool runs.

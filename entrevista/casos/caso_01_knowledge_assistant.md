@@ -75,11 +75,11 @@ That single question needs **three different documents** (remote-work policy, be
                                         ▼
                               ┌───────────────────┐
                               │      PLANNER      │  decompose → sub-questions
-                              │  (Sonnet-5)       │  kompass/graph
+                              │  (GPT-5.4)        │  kompass/graph
                               └─────────┬─────────┘
                                         ▼
                     ┌───────────────────────────────────────┐
-                    │        RETRIEVAL ROUTER  (Haiku)       │  kompass/retrieval/router
+                    │    RETRIEVAL ROUTER  (GPT-5.4 nano)    │  kompass/retrieval/router
                     │  per sub-q → {hybrid RAG | CAG |       │
                     │               GraphRAG | NL2SQL}       │
                     └───┬───────────┬───────────┬───────────┘
@@ -90,13 +90,13 @@ That single question needs **three different documents** (remote-work policy, be
                               ▼
                     ┌───────────────────┐
                     │    RESEARCHER     │  synthesize w/ MANDATORY citations
-                    │   (Sonnet-5)      │  kompass/graph
+                    │   (GPT-5.4)       │  kompass/graph
                     └─────────┬─────────┘
                               ▼
                     ┌───────────────────┐   claim ungrounded?
                     │  CRITIC / VERIFIER│──────────────────────┐ (re-retrieve, ≤2x)
                     │   grounding check │◀─────────────────────┘
-                    │   (Haiku)         │  kompass/guardrails
+                    │   (GPT-5.4 nano)  │  kompass/guardrails
                     └───┬───────────┬───┘
              grounded ✓ │           │ action requested? ("file the move for me")
                         ▼           ▼
@@ -141,13 +141,13 @@ That last branch is the whole point: **when Kompass can't ground a claim, it esc
 | Constraint | Reality | Design response |
 |---|---|---|
 | **Latency** | Employees abandon a chat after ~10s of silence. | Stream first token < 0.9s; multi-hop capped; p95 budget < 8s. |
-| **Cost** | Must beat human labor by 100×+ to justify. | Model routing (Haiku for router/critic, Sonnet for synthesis, Opus only on hard reasoning) → ~$0.013/query. [`kompass/models/`](../../docs/03_framework_decision.md) |
+| **Cost** | Must beat human labor by 100×+ to justify. | Model routing (GPT-5.4 nano for router/critic, GPT-5.4 for synthesis, GPT-5.5 only on hard reasoning) → ~$0.013/query. [`kompass/models/`](../../docs/03_framework_decision.md) |
 | **Data freshness** | Policies change; wikis rot; FAQs are stable. | Freshness dictates retrieval strategy (see **T**): stable/hot corpus → CAG; changing → hybrid RAG re-indexed. |
 | **Compliance (GDPR)** | HR docs contain PII; answers are auditable. | PII guardrail + full citation trail + durable run log. [`kompass/guardrails/`](../../docs/04_hitl_patterns.md) |
 | **Access control** | Not every employee may read every doc. | Retrieval filtered by the caller's ACL/role *before* the LLM sees a chunk (retrieve-then-authorize, never the reverse). |
 | **Reproducibility** | Public portfolio, no proprietary data. | Synthetic **ACME** corpus + SQLite + local Chroma; `make seed` rebuilds it. |
 
-The models are configured centrally in [`kompass/config.py`](../../README.md): `model_reasoning = claude-opus-4-8`, `model_balanced = claude-sonnet-5`, `model_fast = claude-haiku-4-5`. Nothing is hard-coded per node — routing is a config knob.
+The models are configured centrally in [`kompass/config.py`](../../README.md): `model_reasoning = openai:gpt-5.5`, `model_balanced = openai:gpt-5.4`, `model_fast = openai:gpt-5.4-nano`. Nothing is hard-coded per node — routing is a config knob.
 
 > **Interview soundbite:** "Access control is the constraint juniors forget. I authorize *before* retrieval, not after generation — the LLM must never see a chunk the user isn't allowed to read, or the citation itself leaks the secret."
 
@@ -213,7 +213,7 @@ The knowledge core is read-mostly, so the interesting delivery concerns are **du
 
 - **Durable, resumable runs.** State is persisted by a LangGraph checkpointer — SQLite locally, Postgres in prod ([`kompass/config.py`](../../README.md)). This is what makes a paused HITL run survive a process restart (see **R**), and it gives free audit logging.
 - **Streaming.** Token streaming to the Streamlit UI and FastAPI (`POST /chat`, `POST /resume`, `GET /runs/{id}`) so first token lands < 0.9s even when the full multi-hop answer takes ~3s. [`kompass/api/`](../../README.md).
-- **Model routing + caching + token budgets.** Haiku for the router/critic, Sonnet for synthesis, Opus reserved for genuinely hard reasoning; prompt-caching on the system/policy preamble. This is what keeps cost/query at ~$0.013 despite 3–5 model calls per question. [`kompass/models/`](../../docs/03_framework_decision.md).
+- **Model routing + caching + token budgets.** GPT-5.4 nano for the router/critic, GPT-5.4 for synthesis, GPT-5.5 reserved for genuinely hard reasoning; prompt-caching on the system/policy preamble. This is what keeps cost/query at ~$0.013 despite 3–5 model calls per question. [`kompass/models/`](../../docs/03_framework_decision.md).
 - **Observability.** Langfuse traces every node with cost/latency tags; the golden-set eval runs in CI ([`.github/workflows/ci.yml`](../../README.md)) so a prompt change that tanks faithfulness fails the PR.
 - **Reproducible demo.** `make seed && make demo` rebuilds the ACME corpus and runs the canonical end-to-end flow — no proprietary data, no cloud dependency for the core.
 
@@ -240,7 +240,7 @@ Case 1 is read-mostly, so HITL is *dormant* until the assistant crosses from **a
 ```python
 # kompass/graph — declarative HITL (LangGraph v1)
 action_agent = create_agent(
-    model=settings.model_balanced,          # claude-sonnet-5
+    model=settings.model_balanced,          # openai:gpt-5.4
     tools=[ticketing_mcp],                   # write-capable → risky
     middleware=[
         HumanInTheLoopMiddleware(

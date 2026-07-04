@@ -10,8 +10,19 @@ singleton anywhere in the package:
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Repo root — relative paths in settings (DB, Chroma) resolve against this, so
+# MCP subprocesses and scripts work regardless of their working directory.
+ROOT = Path(__file__).resolve().parents[1]
+
+# Export .env into the process environment: provider SDKs (OpenAI, Anthropic, ...)
+# read their API keys from os.environ, which keeps the model layer provider-agnostic.
+load_dotenv(ROOT / ".env")
 
 
 class Settings(BaseSettings):
@@ -23,10 +34,12 @@ class Settings(BaseSettings):
     )
 
     # ── Model provider ────────────────────────────────────────────────
-    anthropic_api_key: str = Field(default="", alias="ANTHROPIC_API_KEY")
-    model_reasoning: str = Field(default="claude-opus-4-8", alias="KOMPASS_MODEL_REASONING")
-    model_balanced: str = Field(default="claude-sonnet-5", alias="KOMPASS_MODEL_BALANCED")
-    model_fast: str = Field(default="claude-haiku-4-5-20251001", alias="KOMPASS_MODEL_FAST")
+    # Models are "provider:model" strings resolved by langchain's init_chat_model,
+    # so switching provider is a config change, not a code change.
+    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    model_reasoning: str = Field(default="openai:gpt-5.5", alias="KOMPASS_MODEL_REASONING")
+    model_balanced: str = Field(default="openai:gpt-5.4", alias="KOMPASS_MODEL_BALANCED")
+    model_fast: str = Field(default="openai:gpt-5.4-nano", alias="KOMPASS_MODEL_FAST")
 
     # ── Retrieval ─────────────────────────────────────────────────────
     vector_backend: str = Field(default="chroma", alias="KOMPASS_VECTOR_BACKEND")

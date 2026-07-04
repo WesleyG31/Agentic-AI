@@ -9,15 +9,15 @@ from pathlib import Path
 
 import chromadb
 
-from kompass.config import settings
+from kompass.config import ROOT, settings
 
-CORPUS = Path(__file__).resolve().parents[2] / "corpus"
+CORPUS = ROOT / "corpus"
 COLLECTION = "acme_docs"
 
 
 def build_db(db_path: str | Path | None = None) -> dict[str, int]:
     """Create the ACME SQLite database from corpus/sql/seed.sql. Returns row counts per table."""
-    path = Path(db_path or settings.acme_db)
+    path = Path(db_path) if db_path else ROOT / settings.acme_db
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.executescript((CORPUS / "sql" / "seed.sql").read_text(encoding="utf-8"))

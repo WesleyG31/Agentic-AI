@@ -84,7 +84,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 checkpointer = PostgresSaver.from_conn_string(settings.postgres_dsn)
 
 agent = create_agent(
-    model="anthropic:claude-...",           # provider-agnostic; swap freely
+    model="openai:gpt-5.4",                 # provider-agnostic; swap freely
     tools=[issue_refund, reset_password, escalate_to_human],
     middleware=[
         HumanInTheLoopMiddleware(

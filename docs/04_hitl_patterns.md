@@ -100,7 +100,7 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import HumanInTheLoopMiddleware
 
 agent = create_agent(
-    model="claude-...",           # provider-agnostic; Kompass configures this in config.py
+    model="openai:gpt-5.4",       # provider-agnostic; Kompass configures this in config.py
     tools=[issue_refund, update_ticket, send_email, search_kb],
     middleware=[
         HumanInTheLoopMiddleware(

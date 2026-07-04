@@ -70,7 +70,7 @@ Single agentic graph on **LangGraph v1**, one durable state object per ticket, d
         │
         ▼
    ┌─────────────┐   classify intent + language + extract entities (order_id, address)
-   │   Triage    │   model: claude-haiku-4-5  (cheap, high-volume)
+   │   Triage    │   model: openai:gpt-5.4-nano  (cheap, high-volume)
    └─────┬───────┘
          ▼
    ┌─────────────┐   plan-and-execute; routes; cuts loops (max steps)
@@ -251,7 +251,7 @@ The **action-precision and unsafe-action** metrics are the ones I'd put on the s
 
 - **Serving.** FastAPI — `POST /chat`, `POST /resume`, `GET /runs/{id}` — plus a Streamlit chat UI that renders citations and the HITL approval card. The `/resume` endpoint is what makes durable HITL usable in production.
 - **Durability.** SQLite checkpointer for the zero-setup local demo; **Postgres checkpointer** for production so an interrupted ticket survives a deploy or a pod restart and can be resumed hours later by a supervisor. See [`../../docs/04_hitl_patterns.md`](../../docs/04_hitl_patterns.md) for the durable-execution discussion (and where Temporal fits for very-long-lived waits).
-- **Model routing + cost control.** Haiku (`claude-haiku-4-5`) for high-volume triage/classification, Sonnet (`claude-sonnet-5`) as the balanced default, Opus (`claude-opus-4-8`) only for genuinely hard reasoning. Caching + token budgets keep the €0.07 autonomous cost/ticket honest.
+- **Model routing + cost control.** GPT-5.4 nano (`openai:gpt-5.4-nano`) for high-volume triage/classification, GPT-5.4 (`openai:gpt-5.4`) as the balanced default, GPT-5.5 (`openai:gpt-5.5`) only for genuinely hard reasoning. Caching + token budgets keep the €0.07 autonomous cost/ticket honest.
 - **Observability.** Langfuse traces every run — the plan, each tool call, the interrupt, the human decision, the resume. For an acting agent this trace *is* the audit log.
 - **Delivery.** Docker + `docker compose` (Qdrant + Postgres + Langfuse), CI in `.github/workflows/ci.yml`, versioned prompts.
 
