@@ -107,26 +107,33 @@ async def build_agent(checkpointer, mode: str | None = None):
         tools = [research, *await mcp_client().get_tools(server_name="ticketing")]
     else:
         tools = await mcp_client().get_tools()
+    middleware = [
+        # Screen the inbound turn first — an injection short-circuits to end
+        # before any retrieval or tool call happens.
+        SafetyMiddleware(),
+        # Cost backstop: end the run if cumulative tokens cross the budget.
+        TokenBudgetMiddleware(settings.token_budget),
+        GroundingCritic(),
+        # Prime the run with lessons from past resolutions, and distill a new one
+        # once this run resolves — self-improvement that never alters control flow.
+        LessonsMiddleware(),
+        HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON),
+    ]
+    if mode == "multi":
+        # Plan-and-execute earns its cost only when the supervisor must decompose work
+        # across the researcher + action tools. The single agent answers support tasks
+        # directly (1–2 steps); planning there just multiplied turns, latency and cost
+        # without improving accuracy — measured, so it is scoped to multi mode.
+        middleware.insert(2, TodoListMiddleware(system_prompt=PLANNING_PROMPT))
+
     return create_agent(
+        # Balanced tier (gpt-5.4) runs the agent loop. Measured against fast/nano: nano
+        # matched fact-correctness but dropped grounding to 77% (more unsupported claims),
+        # which triggered critic retries — net higher latency AND worse quality. Grounding
+        # is a safety metric for a support agent, so balanced stays.
         model=pick("balanced"),
         tools=tools + [analyze, save_memory, recall_memories],
         system_prompt=SYSTEM_PROMPT.format(research_rule=RESEARCH_RULES[mode]),
-        middleware=[
-            # Screen the inbound turn first — an injection short-circuits to end
-            # before any planning, retrieval, or tool call happens.
-            SafetyMiddleware(),
-            # Cost backstop: end the run if cumulative tokens cross the budget.
-            TokenBudgetMiddleware(settings.token_budget),
-            # Plan-and-execute: write_todos lets the model lay out a numbered plan
-            # for multi-step requests and revise it as steps land or fail; the plan
-            # lives in graph state ("todos"), so every surface can render progress.
-            # The default prompt is too reluctant for support work, hence the override.
-            TodoListMiddleware(system_prompt=PLANNING_PROMPT),
-            GroundingCritic(),
-            # Prime the run with lessons from past resolutions, and distill a new one
-            # once this run resolves — self-improvement that never alters control flow.
-            LessonsMiddleware(),
-            HumanInTheLoopMiddleware(interrupt_on=INTERRUPT_ON),
-        ],
+        middleware=middleware,
         checkpointer=checkpointer,
     )

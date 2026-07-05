@@ -24,6 +24,10 @@ from kompass.models.router import pick
 
 DB = ROOT / "kompass_lessons.db"
 
+# Distillation runs only after one of these (gated, side-effecting) tools resolves — that
+# is where a reusable operating lesson is worth the model call.
+_ACTION_TOOLS = {"create_refund", "update_ticket"}
+
 # A candidate whose token-set Jaccard similarity to an existing lesson meets this threshold
 # is treated as a near-duplicate and dropped, so the store can't fill with reworded repeats.
 _DUPLICATE_SIMILARITY = 0.8
@@ -177,8 +181,15 @@ class LessonsMiddleware(AgentMiddleware):
         messages = state["messages"]
         if getattr(messages[-1], "tool_calls", None):
             return None  # not a final answer — tools are about to run
-        if not any(isinstance(m, ToolMessage) for m in messages):
-            return None  # a greeting or bare lookup — nothing was resolved, nothing to learn
+        # Only distill after an ACTION resolves — that is where a reusable operating lesson
+        # lives. Read-only lookups (the common case) skip it, keeping the distill call off
+        # the response hot path so latency/cost stay low.
+        acted = any(
+            isinstance(m, ToolMessage) and getattr(m, "name", None) in _ACTION_TOOLS
+            for m in messages
+        )
+        if not acted:
+            return None
         conversation = [
             (_role(m), str(m.content))
             for m in messages

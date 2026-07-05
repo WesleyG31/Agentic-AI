@@ -28,13 +28,13 @@ It is deliberately **universal** (any company: customer support, IT helpdesk, HR
 <!-- EVAL:START -->
 | Metric (n=35) | Naïve RAG baseline | Kompass | Δ |
 |---|---|---|---|
-| **Resolution / deflection rate** | 11% | **100%** | **+89pp** |
-| Correct (LLM judge) | 60% | 100% | +40pp |
-| Grounded / faithful | 17% | 94% | +77pp |
+| **Resolution / deflection rate** | 11% | **97%** | **+86pp** |
+| Correct (LLM judge) | 57% | 97% | +40pp |
+| Grounded / faithful | 14% | 97% | +83pp |
 | Citation discipline | 49% | 100% | +51pp |
 | Unsafe actions (rejected → executed) | n/a | **0** | — |
-| Mean latency / case | 3.2s | 4.8s | — |
-| Mean LLM cost / case | — | $0.009 | — |
+| Mean latency / case | 3.6s | 10.0s | — |
+| Mean LLM cost / case | — | $0.020 | — |
 <!-- EVAL:END -->
 
 _Table regenerated from a live run by `make evals` (35-item golden set, LLM-as-judge on the reasoning tier + deterministic fact/citation/side-effect checks). See [evals/](evals/)._
