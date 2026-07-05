@@ -140,8 +140,9 @@ kompass/
 - [`04_hitl_patterns.md`](docs/04_hitl_patterns.md) — declarative HITL, idempotency, durability, Temporal
 - [`05_architecture.md`](docs/05_architecture.md) — full architecture + capability tiers
 - [`06_advanced_patterns.md`](docs/06_advanced_patterns.md) — A2A vs MCP, plan-and-execute, sandbox, proactive, self-improving
+- [`07_decision_log.md`](docs/07_decision_log.md) — **24 engineering decisions** (ADR-style): context → decision → what was done → what was learned, with measured numbers
 - [`demo_walkthrough.md`](docs/demo_walkthrough.md) — 3–5 min guided demo / screen-recording script
-- [`blog_why_kompass.md`](docs/blog_why_kompass.md) — the "why": decisions and their measured trade-offs
+- [`blog_why_kompass.md`](docs/blog_why_kompass.md) — the "why", as a narrative essay
 
 ## License
 MIT — built as a public portfolio project.
