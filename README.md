@@ -88,7 +88,9 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 ### Tier 3 — Stretch
 - [x] **Framework comparison spike** — Researcher in PydanticAI, live parity run ([`spike_frameworks/comparison.md`](spike_frameworks/comparison.md))
 - [x] Semantic answer cache — cosine-matched paraphrase reuse on read-only queries (`kompass/models/cache.py`)
-- [ ] Multi-modal ingestion · Multi-agent debate · Saga/compensation
+- [x] Multi-modal ingestion — invoice image → validated fields via the vision model (`kompass/ingest/multimodal.py`)
+- [x] Multi-agent debate / judge panel — 3 independent lenses + synthesizing judge for borderline calls (`kompass/graph/debate.py`)
+- [x] Saga / compensation — all-or-nothing action sequences with reverse-order rollback (`kompass/graph/saga.py`)
 
 ## Quickstart
 

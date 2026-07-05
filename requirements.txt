@@ -29,6 +29,9 @@ httpx>=0.27
 # ── Model Context Protocol (MCP tool servers) ─────────────────────────
 mcp>=1.0.0
 
+# ── Multi-modal ingestion ─────────────────────────────────────────────
+pillow>=10.4
+
 # ── Optional infra (uncomment if you run docker-compose) ──────────────
 # langgraph-checkpoint-postgres>=2.0.0   # durable Postgres checkpointer
 # psycopg[binary]>=3.2
