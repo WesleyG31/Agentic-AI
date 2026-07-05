@@ -243,11 +243,11 @@ The router recognises a **hybrid** question — one structured fact (the balance
 
 ```
 requester ─▶ /chat ─▶ Planner ─▶ Supervisor ─▶ Action Agent
-  1. verify order via MCP  → order #4471 exists, delivered, €89.00, eligible
-  2. draft refund          → {order: 4471, amount: 89.00, reason: "damaged"}
+  1. verify order via MCP  → order #4471 exists, delivered, €189.99, eligible
+  2. draft refund          → {order: 4471, amount: 189.99, reason: "damaged"}
   3. HITL middleware       ─▶ ⏸ PAUSE  (state checkpointed)
         reviewer sees a card: [approve] [edit amount/reason] [reject]
-  4. reviewer edits to €89.00 + goodwill note, approves ─▶ /resume
+  4. reviewer approves (or edits reason + a goodwill note) ─▶ /resume
   5. execute refund via MCP (idempotent)  ─▶ confirm to requester + log
 ```
 

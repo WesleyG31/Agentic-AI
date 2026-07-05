@@ -6,8 +6,8 @@
 
 *Not "look how well it answers" — **"it resolved N% of requests end-to-end with no human, saving X min and €Y per case."***
 
-[![ci](https://img.shields.io/badge/ci-pending-lightgrey)](.github/workflows/ci.yml)
-[![eval score](https://img.shields.io/badge/eval-100%25%20resolved%20·%200%20unsafe%20(n%3D35)-brightgreen)](evals/)
+[![ci](https://github.com/WesleyG31/Agentic-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/WesleyG31/Agentic-AI/actions/workflows/ci.yml)
+[![eval score](https://img.shields.io/badge/eval-97%25%20resolved%20·%200%20unsafe%20(n%3D35)-brightgreen)](evals/)
 [![framework](https://img.shields.io/badge/LangGraph-v1.0-1C3C3C)](docs/03_framework_decision.md)
 [![python](https://img.shields.io/badge/python-3.11+-blue)](requirements.txt)
 
@@ -140,6 +140,8 @@ kompass/
 - [`04_hitl_patterns.md`](docs/04_hitl_patterns.md) — declarative HITL, idempotency, durability, Temporal
 - [`05_architecture.md`](docs/05_architecture.md) — full architecture + capability tiers
 - [`06_advanced_patterns.md`](docs/06_advanced_patterns.md) — A2A vs MCP, plan-and-execute, sandbox, proactive, self-improving
+- [`demo_walkthrough.md`](docs/demo_walkthrough.md) — 3–5 min guided demo / screen-recording script
+- [`blog_why_kompass.md`](docs/blog_why_kompass.md) — the "why": decisions and their measured trade-offs
 
 ## License
 MIT — built as a public portfolio project.
