@@ -24,6 +24,7 @@ from pydantic import BaseModel
 
 from kompass.config import ROOT, settings
 from kompass.graph.agent import build_agent
+from kompass.models import cache
 
 
 @asynccontextmanager
@@ -87,8 +88,23 @@ def _run_response(thread_id: str, state: dict) -> dict:
 @app.post("/chat")
 async def chat(req: ChatRequest) -> dict:
     thread_id = req.thread_id or uuid4().hex
+
+    # Semantic cache — only for a fresh, standalone question. Write tools always pause
+    # for HITL, so a first-turn "completed" run is guaranteed read-only and safe to cache.
+    fresh = req.thread_id is None
+    if fresh and (hit := cache.lookup(req.message)):
+        return {
+            "thread_id": thread_id,
+            "status": "completed",
+            "answer": hit,
+            "pending_actions": None,
+        }
+
     state = await app.state.agent.ainvoke({"messages": [("user", req.message)]}, _config(thread_id))
-    return _run_response(thread_id, state)
+    resp = _run_response(thread_id, state)
+    if fresh and resp["status"] == "completed":
+        cache.store(req.message, resp["answer"])
+    return resp
 
 
 @app.post("/chat/stream")

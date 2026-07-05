@@ -17,6 +17,7 @@ from langchain.agents.middleware import HumanInTheLoopMiddleware, TodoListMiddle
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from kompass.config import ROOT, settings
+from kompass.graph.budget import TokenBudgetMiddleware
 from kompass.graph.critic import GroundingCritic
 from kompass.graph.workers import research
 from kompass.guardrails.safety import SafetyMiddleware
@@ -24,6 +25,7 @@ from kompass.memory.lessons import LessonsMiddleware
 from kompass.memory.store import recall_memories, save_memory
 from kompass.models.router import pick
 from kompass.retrieval.nl2sql import SCHEMA
+from kompass.sandbox.analyst import analyze
 
 SYSTEM_PROMPT = """You are Kompass, ACME GmbH's support & operations assistant. \
 Today is 2026-07-04.
@@ -44,6 +46,8 @@ Rules:
   confirmation step — never ask the user for confirmation in chat; call the tool directly
   once the facts check out.
 - Refunds over €500 require supervisor approval — state this in the refund reason.
+- For quantitative questions a single SELECT can't express (averages, distributions,
+  trends, what-if math), use the analyze tool: fetch rows with SQL, then compute in Python.
 - Memory: when a user identifies themselves, recall_memories for them; save_memory when
   they state a durable preference or standing instruction worth keeping across conversations.
 - If a request cannot be resolved with your tools, say what is missing and escalate;
@@ -105,12 +109,14 @@ async def build_agent(checkpointer, mode: str | None = None):
         tools = await mcp_client().get_tools()
     return create_agent(
         model=pick("balanced"),
-        tools=tools + [save_memory, recall_memories],
+        tools=tools + [analyze, save_memory, recall_memories],
         system_prompt=SYSTEM_PROMPT.format(research_rule=RESEARCH_RULES[mode]),
         middleware=[
             # Screen the inbound turn first — an injection short-circuits to end
             # before any planning, retrieval, or tool call happens.
             SafetyMiddleware(),
+            # Cost backstop: end the run if cumulative tokens cross the budget.
+            TokenBudgetMiddleware(settings.token_budget),
             # Plan-and-execute: write_todos lets the model lay out a numbered plan
             # for multi-step requests and revise it as steps land or fail; the plan
             # lives in graph state ("todos"), so every surface can render progress.

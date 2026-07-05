@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     # single = one agent with all tools; multi = supervisor delegates research
     # to a worker agent, keeping the write tools (and HITL gate) to itself.
     agent_mode: str = Field(default="single", alias="KOMPASS_AGENT_MODE")
+    # Per-run token cap enforced by TokenBudgetMiddleware (runaway-loop backstop).
+    token_budget: int = Field(default=200_000, alias="KOMPASS_TOKEN_BUDGET")
 
     # ── Retrieval ─────────────────────────────────────────────────────
     vector_backend: str = Field(default="chroma", alias="KOMPASS_VECTOR_BACKEND")

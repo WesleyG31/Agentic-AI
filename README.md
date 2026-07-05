@@ -73,21 +73,22 @@ Full diagram and rationale: [`docs/05_architecture.md`](docs/05_architecture.md)
 - [x] Guardrails — citations, read-only SQL boundary, arg validation, `SafetyMiddleware` (93% injection block, 0% false-positive), PII redaction helper
 - [x] Streaming + observability — SSE `/chat/stream` + per-call JSONL tracing (`runs.jsonl`); Langfuse behind `LANGFUSE_ENABLED`
 - [x] Evaluation — 35-item golden set + LLM judge + naïve-RAG baseline + value metrics + CI regression gate (live table above)
-- [x] Model routing (fast/balanced/reasoning tiers via config) — *token budgets pending*
+- [x] Model routing (fast/balanced/reasoning tiers via config) + per-run token budget (`TokenBudgetMiddleware`)
 - [x] Deploy/MLOps — Dockerfile (288 MB) + CI + compose infra; prompts versioned in git
 
 ### Tier 2 — Advanced
 - [x] A2A protocol — signed Agent Card + JSON-RPC specialist endpoint (`kompass/a2a/`)
 - [x] Plan-and-execute + replanning — `TodoListMiddleware` with a Kompass planning prompt
-- [ ] Sandboxed code execution
+- [x] Sandboxed code execution — AST-allowlisted subprocess + timeout, Data Analyst tool (`kompass/sandbox/`)
 - [x] Proactive / event-driven autonomy — ticket webhook triaged unattended by the read-only Researcher (`kompass/triggers/`)
-- [ ] Self-improving loop (feedback → few-shots/memory)
+- [x] Self-improving loop — distilled lessons injected into future runs (`kompass/memory/lessons.py`)
 - [x] User-simulator eval harness (τ-bench style) — multi-turn goal-driven episodes (`evals/user_simulator/`)
 - [x] Dedicated safety agent + prompt-injection red-team suite (`kompass/guardrails/`, `evals/red_team.py`)
 
 ### Tier 3 — Stretch
 - [x] **Framework comparison spike** — Researcher in PydanticAI, live parity run ([`spike_frameworks/comparison.md`](spike_frameworks/comparison.md))
-- [ ] Multi-modal ingestion · Multi-agent debate · Saga/compensation · Semantic caching
+- [x] Semantic answer cache — cosine-matched paraphrase reuse on read-only queries (`kompass/models/cache.py`)
+- [ ] Multi-modal ingestion · Multi-agent debate · Saga/compensation
 
 ## Quickstart
 
