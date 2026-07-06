@@ -134,6 +134,7 @@ kompass/
 ```
 
 ## Docs index
+- [`guia_del_codigo.md`](docs/guia_del_codigo.md) — **(español)** code map: what Kompass is, what it solves, and **where every piece lives** in the repo
 - [`01_agentic_ai_deep_dive.md`](docs/01_agentic_ai_deep_dive.md) — what agentic AI is, the spectrum, design patterns
 - [`02_retrieval_strategies.md`](docs/02_retrieval_strategies.md) — alternatives to RAG (CAG, GraphRAG, NL2SQL, adaptive router)
 - [`03_framework_decision.md`](docs/03_framework_decision.md) — why LangGraph v1 (research + trade-offs + sources)
