@@ -14,9 +14,9 @@ import math
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
 from evals import baseline
@@ -25,9 +25,12 @@ from evals.judge import judge
 from kompass.config import ROOT, settings
 from kompass.graph.agent import build_agent
 from kompass.observability import agent_trace, client, token_usage
+from kompass.persistence import checkpoint_saver
 from kompass.prompts import prompt_manifest
 from kompass.retrieval.nl2sql import run_sql
+from kompass.runtime import RuntimeContext, runtime_scope, tenant_scoped_id
 from kompass.scripts.seed import build_db
+from kompass.security.identity import TOOL_SCOPES
 
 RESULTS = ROOT / "evals" / "results"
 REGRESSION = ROOT / "evals" / "regression_baseline.json"
@@ -37,14 +40,22 @@ MAX_RESUMES = 5
 async def agent_episode(agent, item: dict) -> dict:
     """Run one full graph episode, including scripted HITL decisions."""
     thread_id = f"eval-{item['id']}-{uuid4().hex[:8]}"
-    base_config = {"configurable": {"thread_id": thread_id}}
+    context = RuntimeContext.create(
+        tenant_id="eval",
+        user_id="golden-regression-suite",
+        timezone_name=settings.default_timezone,
+        locale=settings.default_locale,
+        scopes=frozenset(TOOL_SCOPES.values()),
+        correlation_id=thread_id,
+    )
+    base_config = {"configurable": {"thread_id": tenant_scoped_id(context, thread_id)}}
     decision = (item.get("action") or {}).get("decision", "approve")
     t0 = time.monotonic()
 
-    with agent_trace(
+    with runtime_scope(context), agent_trace(
         name="kompass-evaluation-episode",
         thread_id=thread_id,
-        user_id="golden-regression-suite",
+        user_id=context.user_id,
         input={"case_id": item["id"], "question": item["question"]},
         tags=["evaluation", item["category"]],
         metadata={
@@ -190,7 +201,7 @@ def score(item: dict, episode: dict, action_ok: bool | None) -> dict:
 async def run_agent_system(items: list[dict]) -> dict[str, dict]:
     """Run read cases concurrently and isolate every side-effect case with a fresh DB."""
     episodes: dict[str, dict] = {}
-    async with AsyncSqliteSaver.from_conn_string(str(ROOT / settings.sqlite_checkpoint)) as saver:
+    async with checkpoint_saver() as saver:
         agent = await build_agent(saver)
         knowledge = [i for i in items if not i.get("action")]
         actions = [i for i in items if i.get("action")]
@@ -362,12 +373,16 @@ def update_readme(table: str) -> None:
 async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--case-id", action="append", dest="case_ids")
     parser.add_argument("--agent-only", action="store_true")
     parser.add_argument("--ci", action="store_true")
     parser.add_argument("--min-score", type=float)
+    parser.add_argument("--record-live-baseline", action="store_true")
     args = parser.parse_args()
+    if args.limit and args.case_ids:
+        parser.error("--limit and --case-id cannot be combined")
 
-    items = load_golden(args.limit)
+    items = load_golden(args.limit, args.case_ids)
     print(f"golden set: {len(items)} items")
     print("running agent episodes...")
     agent_eps = await run_agent_system(items)
@@ -420,6 +435,50 @@ async def main() -> int:
     result_path = RESULTS / "results.json"
     result_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
     print(f"results -> {result_path}")
+
+    if args.record_live_baseline:
+        live_path = ROOT / "evals" / "live_baseline.json"
+        live = {
+            "schema_version": 1,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "provider": settings.llm_provider,
+            "model": (
+                settings.ollama_model_balanced
+                if settings.llm_provider == "ollama"
+                else settings.model_balanced
+            ),
+            "case_ids": [item["id"] for item in items],
+            "aggregate": agent_agg,
+            "cases": [
+                {
+                    key: row[key]
+                    for key in (
+                        "id",
+                        "category",
+                        "task_success",
+                        "answer_correctness",
+                        "hallucination",
+                        "tool_selection",
+                        "tool_arguments_correct",
+                        "retrieval_relevance",
+                        "action_ok",
+                        "unsafe",
+                        "selected_tools",
+                        "latency_s",
+                        "tokens",
+                        "cost_usd",
+                        "notes",
+                    )
+                }
+                for row in agent_scored
+            ],
+            "review": {
+                "status": "candidate",
+                "method": "inspect each selected case and its observable trajectory",
+            },
+        }
+        live_path.write_text(json.dumps(live, indent=2), encoding="utf-8")
+        print(f"live baseline candidate -> {live_path}")
 
     if args.ci:
         failures = regression_failures(agent_agg, args.min_score)

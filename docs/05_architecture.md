@@ -1,5 +1,11 @@
 # Kompass Architecture — Two Interop Layers (MCP + A2A) and a Capability Model
 
+> **Status: historical design document.** It preserves the original tiered portfolio design and
+> includes capabilities that are now experimental or superseded. The current implementation and
+> security boundaries are in [Enterprise runtime operations](enterprise_runtime.md) and the README.
+> The current A2A path uses the official 1.0 SDK plus bearer-auth hooks, and distilled lessons need
+> explicit review before use.
+
 Kompass is an **agentic Support & Operations assistant**: it does not merely answer a question, it **resolves and acts** — planning a path, choosing the right retrieval strategy per query, calling tools through MCP, drafting a side-effecting action, pausing for a human only when the action is risky, executing durably, and remembering the outcome for next time.
 
 This document is the map of that machine. It covers (1) the full runtime architecture and a walk through every node; (2) the two interoperability layers that define a 2026-grade agent stack — **MCP (vertical, agent↔tools)** and **A2A (horizontal, agent↔agent)**; (3) the **capability model** as tiered checklists; (4) the **stack**; (5) **how real users use it** across surfaces and three end-to-end journeys; and (6) the **repo layout** mapped to capabilities.

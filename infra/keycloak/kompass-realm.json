@@ -1,0 +1,98 @@
+{
+  "realm": "kompass",
+  "displayName": "Kompass Local",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "loginWithEmailAllowed": true,
+  "clients": [
+    {
+      "clientId": "kompass-api",
+      "name": "Kompass local API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:*/*"],
+      "webOrigins": ["http://localhost:*"],
+      "protocolMappers": [
+        {
+          "name": "kompass-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "kompass-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        },
+        {
+          "name": "tenant-id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "multivalued": "false",
+            "access.token.claim": "true",
+            "id.token.claim": "true"
+          }
+        },
+        {
+          "name": "permissions",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "permissions",
+            "claim.name": "permissions",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "alice",
+      "firstName": "Alice",
+      "lastName": "Tenant A",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "alice@tenant-a.local",
+      "requiredActions": [],
+      "attributes": {
+        "tenant_id": ["tenant-a"],
+        "permissions": [
+          "documents:read", "operations:read", "tickets:read", "research:read",
+          "analytics:read", "memory:write", "memory:read", "refunds:create", "tickets:write"
+        ]
+      },
+      "credentials": [
+        {"type": "password", "value": "local-alice-password", "temporary": false}
+      ]
+    },
+    {
+      "username": "bob",
+      "firstName": "Bob",
+      "lastName": "Tenant B",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "bob@tenant-b.local",
+      "requiredActions": [],
+      "attributes": {
+        "tenant_id": ["tenant-b"],
+        "permissions": ["documents:read", "operations:read", "tickets:read"]
+      },
+      "credentials": [
+        {"type": "password", "value": "local-bob-password", "temporary": false}
+      ]
+    }
+  ]
+}

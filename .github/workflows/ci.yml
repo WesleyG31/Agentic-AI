@@ -19,8 +19,16 @@ jobs:
         run: python -m pip install -r requirements-dev.txt
       - name: Lint
         run: ruff check .
+      - name: Typecheck governed runtime
+        run: mypy --ignore-missing-imports --check-untyped-defs kompass/security/oidc.py kompass/actions/executor.py kompass/actions/postgres.py kompass/actions/reconciliation.py kompass/persistence.py kompass/scripts/load_test.py evals/judge.py evals/dataset.py
       - name: Test
         run: pytest -q
+      - name: Dependency audit
+        run: python -m pip_audit -r requirements-production.txt --progress-spinner off
+      - name: Offline agent evaluation gate
+        run: python -m evals.offline --ci
+      - name: Verify release identity
+        run: python -m kompass.release
 
   # Runs the eval suite on a fixed golden set and fails if the score
   # regresses below the committed threshold. Produces the README badge.

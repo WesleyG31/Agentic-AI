@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "release_version": "3.0.0",
+  "workflow_version": "langgraph-supervisor-v3",
+  "tool_schema_version": "mcp-2026-v2",
+  "policy_version": "kompass-authz-trust-actions-v2",
+  "eval_dataset": {
+    "version": "golden-60-v1",
+    "path": "evals/golden_set.json",
+    "sha256": "7668ac8ef3322cf826bd06effcb08258cede3add5e7a927ae3812ce054b7817a"
+  },
+  "protocols": {
+    "a2a": "1.0",
+    "mcp_sdk_major": "2"
+  }
+}

@@ -1,10 +1,10 @@
-"""MCP server: read-only SQL access to the ACME operational database. Runs over stdio."""
+"""MCP server: read-only SQL plus an explicit schema resource."""
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from kompass.retrieval.nl2sql import SCHEMA, run_sql
 
-mcp = FastMCP("acme-sql", log_level="WARNING")
+mcp = MCPServer("acme-sql", log_level="WARNING")
 
 
 @mcp.tool()
@@ -19,6 +19,12 @@ def query_database(sql: str) -> str:
     tickets, employees, refunds). Returns rows as a list of dicts, capped at 50."""
     rows = run_sql(sql)
     return f"{len(rows)} row(s): {rows}"
+
+
+@mcp.resource("kompass://schema/acme", mime_type="text/plain")
+def schema_resource() -> str:
+    """The operational schema exposed through the MCP resources capability."""
+    return SCHEMA
 
 
 if __name__ == "__main__":

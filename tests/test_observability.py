@@ -1,6 +1,9 @@
 """The Langfuse adapter must remain a safe no-op for offline tests."""
 
+from datetime import UTC, datetime
+
 from kompass import observability
+from kompass.runtime import FrozenClock, RuntimeContext, runtime_scope
 
 
 def test_disabled_trace_preserves_graph_config(monkeypatch):
@@ -38,3 +41,30 @@ def test_langfuse_mask_accepts_v4_keyword_and_redacts_pii():
     assert observability._mask_payload(data={"email": "person@example.com"}) == {
         "email": "[redacted-email]"
     }
+
+
+def test_content_export_is_hash_only_unless_explicitly_enabled(monkeypatch):
+    monkeypatch.setattr(observability.settings, "langfuse_capture_content", False)
+    exported = observability._export_payload({"prompt": "private customer text"})
+    assert set(exported) == {"content_type", "content_sha256", "content_bytes"}
+    assert "private" not in str(exported)
+
+
+def test_vendor_neutral_metric_correlates_and_redacts(monkeypatch):
+    context = RuntimeContext.create(
+        tenant_id="tenant-a",
+        user_id="operator",
+        clock=FrozenClock(datetime(2026, 8, 16, 12, tzinfo=UTC)),
+        request_id="request-1",
+        correlation_id="correlation-1",
+    )
+    sink = observability.InMemoryTelemetrySink()
+    with runtime_scope(context), observability.telemetry_scope(sink):
+        point = observability.record_metric(
+            "kompass.tool.latency", 12.5, unit="ms", attributes={"tool": "search", "token": "x"}
+        )
+
+    assert point.request_id == "request-1"
+    assert point.correlation_id == "correlation-1"
+    assert point.tenant_partition and point.tenant_partition != "tenant-a"
+    assert point.attributes == {"tool": "search", "token": "[redacted]"}

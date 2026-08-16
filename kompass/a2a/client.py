@@ -1,49 +1,126 @@
-"""A2A client: discover a peer agent by its signed card, then delegate a task.
+"""Official A2A 1.0 client with auth, timeout, context, and trust handling."""
 
-Demo CLI (server must be running, see kompass/a2a/server.py):
+from __future__ import annotations
 
-    python -m kompass.a2a.client "What is ACME's refund window for damaged items?"
-"""
-
+import asyncio
 import sys
-from uuid import uuid4
+from dataclasses import dataclass
 
 import httpx
+from a2a.client import ClientConfig, ClientFactory
+from a2a.helpers import get_artifact_text, new_text_message
+from a2a.types import CancelTaskRequest, GetTaskRequest, Role, SendMessageRequest, TaskState
 
-from kompass.a2a.card import verify
 from kompass.config import settings
+from kompass.runtime import RuntimeContext
+from kompass.security.trust import ContentOrigin, TrustBoundary, TrustedContent
 
 
-def discover(base_url: str) -> dict:
-    """Fetch the peer's Agent Card and verify its signature; raise on mismatch."""
-    card = httpx.get(f"{base_url}/.well-known/agent.json").raise_for_status().json()
-    signature = card.pop("signature", "")
-    if not verify(card, signature):
-        raise ValueError(f"agent card signature mismatch for {base_url}")
-    return card
+@dataclass(frozen=True)
+class A2AResult:
+    task_id: str
+    state: int
+    text: str
 
 
-def send_task(base_url: str, question: str) -> str:
-    """JSON-RPC ``tasks/send`` round trip; returns the first artifact's text."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": 1,
-        "method": "tasks/send",
-        "params": {
-            "id": uuid4().hex,
-            "message": {"role": "user", "parts": [{"text": question}]},
-        },
+async def send_task(
+    base_url: str,
+    question: str,
+    *,
+    token: str,
+    context: RuntimeContext,
+) -> A2AResult:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Request-ID": context.request_id,
+        "X-Correlation-ID": context.correlation_id,
     }
-    resp = httpx.post(f"{base_url}/a2a", json=payload, timeout=120).raise_for_status().json()
-    if "error" in resp:
-        raise RuntimeError(f"A2A error {resp['error']['code']}: {resp['error']['message']}")
-    return resp["result"]["artifacts"][0]["parts"][0]["text"]
+    async with httpx.AsyncClient(headers=headers, timeout=settings.a2a_timeout_seconds) as http:
+        client = await ClientFactory(
+            ClientConfig(streaming=True, httpx_client=http, accepted_output_modes=["text/plain"])
+        ).create_from_url(base_url)
+        message = new_text_message(question, role=Role.ROLE_USER)
+        request = SendMessageRequest(tenant=context.tenant_id, message=message)
+        task_id = ""
+        state = TaskState.TASK_STATE_UNSPECIFIED
+        artifacts = []
+        try:
+            async with asyncio.timeout(settings.a2a_timeout_seconds):
+                async for chunk in client.send_message(request):
+                    if chunk.HasField("task"):
+                        task_id = chunk.task.id
+                        state = chunk.task.status.state
+                        artifacts.extend(chunk.task.artifacts)
+                    elif chunk.HasField("status_update"):
+                        state = chunk.status_update.status.state
+                    elif chunk.HasField("artifact_update"):
+                        artifacts.append(chunk.artifact_update.artifact)
+        finally:
+            await client.close()
+    if not task_id:
+        raise RuntimeError("A2A peer returned no task")
+    text = "\n".join(get_artifact_text(artifact) for artifact in artifacts)
+    safe = TrustBoundary().evaluate(
+        TrustedContent(text, ContentOrigin.REMOTE_AGENT, provenance=f"a2a:task:{task_id}"),
+        purpose="model",
+    )
+    return A2AResult(task_id, state, safe.rendered)
+
+
+async def cancel_task(
+    base_url: str,
+    task_id: str,
+    *,
+    token: str,
+    context: RuntimeContext,
+):
+    headers = {"Authorization": f"Bearer {token}", "X-Request-ID": context.request_id}
+    async with httpx.AsyncClient(headers=headers, timeout=settings.a2a_timeout_seconds) as http:
+        client = await ClientFactory(ClientConfig(httpx_client=http)).create_from_url(base_url)
+        try:
+            return await client.cancel_task(
+                CancelTaskRequest(tenant=context.tenant_id, id=task_id)
+            )
+        finally:
+            await client.close()
+
+
+async def get_task(
+    base_url: str,
+    task_id: str,
+    *,
+    token: str,
+    context: RuntimeContext,
+):
+    headers = {"Authorization": f"Bearer {token}", "X-Request-ID": context.request_id}
+    async with httpx.AsyncClient(headers=headers, timeout=settings.a2a_timeout_seconds) as http:
+        client = await ClientFactory(ClientConfig(httpx_client=http)).create_from_url(base_url)
+        try:
+            return await client.get_task(GetTaskRequest(tenant=context.tenant_id, id=task_id))
+        finally:
+            await client.close()
+
+
+async def _main() -> None:
+    base_url = settings.a2a_base_url
+    question = " ".join(sys.argv[1:]) or "What is ACME's damaged-item refund policy?"
+    if not settings.a2a_bearer_token:
+        raise RuntimeError("KOMPASS_A2A_BEARER_TOKEN is required")
+    context = RuntimeContext.create(
+        tenant_id=settings.default_tenant_id,
+        user_id="a2a-cli",
+        scopes={"research:read"},
+        principal_kind="service",
+    )
+    result = await send_task(
+        base_url,
+        question,
+        token=settings.a2a_bearer_token,
+        context=context,
+    )
+    print(result.text)
 
 
 if __name__ == "__main__":
-    sys.stdout.reconfigure(encoding="utf-8")  # Windows consoles default to cp1252
-    base_url = f"http://localhost:{settings.a2a_port}"
-    question = " ".join(sys.argv[1:]) or "What is ACME's refund window for damaged items?"
-    card = discover(base_url)
-    print(f"discovered {card['name']} v{card['version']} — skill: {card['skills'][0]['id']}\n")
-    print(send_task(base_url, question))
+    sys.stdout.reconfigure(encoding="utf-8")
+    asyncio.run(_main())

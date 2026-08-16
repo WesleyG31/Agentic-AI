@@ -12,13 +12,15 @@ import asyncio
 import sys
 from uuid import uuid4
 
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
-from kompass.config import ROOT, settings
+from kompass.config import settings
 from kompass.graph.agent import build_agent
+from kompass.persistence import checkpoint_saver
 from kompass.retrieval.nl2sql import run_sql
+from kompass.runtime import RuntimeContext, runtime_scope, tenant_scoped_id
 from kompass.scripts.seed import build_db
+from kompass.security.identity import TOOL_SCOPES
 
 USER_MSG = (
     "Hi, I'm Lena Fischer (lena.fischer@web.de). My order 4471 arrived damaged - the "
@@ -46,19 +48,26 @@ async def main() -> int:
     build_db()  # reset demo data so reruns start clean
     print(f"user> {USER_MSG}\n")
 
-    async with AsyncSqliteSaver.from_conn_string(
-        str(ROOT / settings.sqlite_checkpoint)
-    ) as saver:
+    async with checkpoint_saver() as saver:
         agent = await build_agent(saver)
-        config = {"configurable": {"thread_id": f"demo-{uuid4().hex[:8]}"}}
+        thread_id = f"demo-{uuid4().hex[:8]}"
+        context = RuntimeContext.create(
+            tenant_id=settings.default_tenant_id,
+            user_id="demo-reviewer",
+            timezone_name=settings.default_timezone,
+            locale=settings.default_locale,
+            scopes=frozenset(TOOL_SCOPES.values()),
+        )
+        config = {"configurable": {"thread_id": tenant_scoped_id(context, thread_id)}}
 
-        state = await agent.ainvoke({"messages": [("user", USER_MSG)]}, config)
-        while state.get("__interrupt__"):
-            n = sum(show_interrupt(i) for i in state["__interrupt__"])
-            print("reviewer> approve\n")
-            state = await agent.ainvoke(
-                Command(resume={"decisions": [{"type": "approve"}] * n}), config
-            )
+        with runtime_scope(context):
+            state = await agent.ainvoke({"messages": [("user", USER_MSG)]}, config)
+            while state.get("__interrupt__"):
+                n = sum(show_interrupt(i) for i in state["__interrupt__"])
+                print("reviewer> approve\n")
+                state = await agent.ainvoke(
+                    Command(resume={"decisions": [{"type": "approve"}] * n}), config
+                )
 
         print(f"kompass> {state['messages'][-1].content}\n")
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, Field, PrivateAttr
 
 from evals.dataset import expected_tools
@@ -78,7 +79,7 @@ def judge(
     answer: str,
     trajectory: list[dict] | None = None,
     action_ok: bool | None = None,
-    config: dict | None = None,
+    config: RunnableConfig | None = None,
 ) -> Verdict:
     """Grade one complete episode with a reasoning-tier structured call."""
     prompt = PROMPT_SPEC.render(
@@ -96,11 +97,14 @@ def judge(
     # models; json_schema is the fallback. OpenAI supports both through LangChain.
     for method in ("function_calling", "json_schema"):
         try:
-            return (
+            result = (
                 pick("reasoning")
                 .with_structured_output(Verdict, method=method)
                 .invoke(prompt, config=config)
             )
+            if isinstance(result, Verdict):
+                return result
+            errors.append(f"{method}: model returned no valid verdict")
         except Exception as exc:  # evaluator failure is surfaced by judge_coverage
             errors.append(f"{method}: {type(exc).__name__}: {exc}")
     raise RuntimeError("LLM judge failed after structured retries: " + " | ".join(errors))

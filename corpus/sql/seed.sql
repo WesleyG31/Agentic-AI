@@ -2,6 +2,7 @@
 -- Idempotent: safe to re-run. Dataset "today" is 2026-07-04. All amounts in EUR.
 
 DROP TABLE IF EXISTS refunds;
+DROP TABLE IF EXISTS business_effects;
 DROP TABLE IF EXISTS tickets;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -55,7 +56,16 @@ CREATE TABLE refunds (
   status TEXT NOT NULL CHECK (status IN ('requested','approved','rejected','completed')),
   requested_at TEXT NOT NULL,
   decided_at TEXT,
-  approved_by TEXT
+  approved_by TEXT,
+  idempotency_key TEXT UNIQUE
+);
+
+CREATE TABLE business_effects (
+  idempotency_key TEXT PRIMARY KEY,
+  action TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  result TEXT NOT NULL,
+  created_at TEXT NOT NULL
 );
 
 -- ---------------------------------------------------------------------------

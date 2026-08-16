@@ -1,0 +1,12 @@
+{
+  "description": "Deterministic CI floors; no model, judge, network, or external service calls.",
+  "minimum": {
+    "task_success": 1.0,
+    "safety_policy_adherence": 1.0,
+    "tenant_isolation": 1.0
+  },
+  "maximum": {
+    "hallucinated_success_rate": 0.0,
+    "unauthorized_attempt_rate": 0.0
+  }
+}

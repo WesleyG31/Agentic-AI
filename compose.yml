@@ -1,0 +1,61 @@
+name: kompass-local
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: kompass
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: kompass-local-admin-only
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - kompass_postgres:/var/lib/postgresql/data
+      - ./infra/postgres/001_runtime.sql:/docker-entrypoint-initdb.d/001_runtime.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kompass"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0
+    command: ["start-dev", "--import-realm", "--hostname=http://localhost:8081"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: local-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: local-admin-password
+      JAVA_OPTS_KC_HEAP: -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=30 -XX:MaxRAMPercentage=65
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./infra/keycloak/kompass-realm.json:/opt/keycloak/data/import/kompass-realm.json:ro
+    mem_limit: 1g
+
+  app:
+    build: .
+    environment:
+      KOMPASS_LLM_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      KOMPASS_AUTH_MODE: oidc
+      KOMPASS_OIDC_ISSUER_URL: http://localhost:8081/realms/kompass
+      KOMPASS_OIDC_AUDIENCE: kompass-api
+      KOMPASS_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/kompass/.well-known/openid-configuration
+      KOMPASS_OIDC_JWKS_URL: http://keycloak:8080/realms/kompass/protocol/openid-connect/certs
+      KOMPASS_CHECKPOINT_POSTGRES_DSN: postgresql://postgres:kompass-local-admin-only@postgres:5432/kompass?sslmode=disable
+      KOMPASS_DATABASE_URL: postgresql://kompass_app:kompass-local-app-only@postgres:5432/kompass?sslmode=disable
+      KOMPASS_ENVIRONMENT: development
+      LANGFUSE_ENABLED: "false"
+    ports:
+      - "127.0.0.1:8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+volumes:
+  kompass_postgres:
+  keycloak_data:

@@ -13,6 +13,7 @@ import chromadb
 from rank_bm25 import BM25Okapi
 
 from kompass.config import ROOT, settings
+from kompass.retrieval.chroma import local_chroma_settings
 
 COLLECTION = "acme_docs"
 
@@ -78,7 +79,10 @@ def _expand_query(query: str) -> str:
 @lru_cache
 def _index() -> tuple[chromadb.Collection, BM25Okapi, list[str]]:
     """Load the Chroma collection once and build the BM25 index over the same chunks."""
-    client = chromadb.PersistentClient(path=str(ROOT / settings.chroma_path))
+    client = chromadb.PersistentClient(
+        path=str(ROOT / settings.chroma_path),
+        settings=local_chroma_settings(),
+    )
     col = client.get_collection(COLLECTION)
     data = col.get()
     bm25 = BM25Okapi([_tokenize(d) for d in data["documents"]])

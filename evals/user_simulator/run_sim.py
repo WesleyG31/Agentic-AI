@@ -21,7 +21,6 @@ import json
 import sys
 from uuid import uuid4
 
-import mcp.client.stdio as mcp_stdio
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
@@ -30,10 +29,9 @@ from evals.user_simulator.simulator import END, UserSimulator
 from kompass.config import ROOT, settings
 from kompass.graph.agent import build_agent
 from kompass.retrieval.nl2sql import run_sql
+from kompass.runtime import RuntimeContext, runtime_scope, tenant_scoped_id
 from kompass.scripts.seed import build_db
-
-# Propagate the private-DB path to the MCP tool subprocesses (see module docstring).
-mcp_stdio.DEFAULT_INHERITED_ENV_VARS.append("KOMPASS_ACME_DB")
+from kompass.security.identity import TOOL_SCOPES
 
 SCENARIOS = ROOT / "evals" / "user_simulator" / "scenarios.json"
 RESULTS = ROOT / "evals" / "results"
@@ -52,7 +50,16 @@ def goal_met(scenario: dict, answer: str) -> bool:
 async def run_scenario(agent, scenario: dict) -> dict:
     """Reset the private DB, then converse until the simulator ends or max_turns is hit."""
     build_db()  # honors KOMPASS_ACME_DB — reset to a clean, goal-unmet state
-    config = {"configurable": {"thread_id": f"sim-{scenario['id']}-{uuid4().hex[:6]}"}}
+    thread_id = f"sim-{scenario['id']}-{uuid4().hex[:6]}"
+    context = RuntimeContext.create(
+        tenant_id="eval",
+        user_id=f"simulator-{scenario['id']}",
+        timezone_name=settings.default_timezone,
+        locale=settings.default_locale,
+        scopes=frozenset(TOOL_SCOPES.values()),
+        correlation_id=thread_id,
+    )
+    config = {"configurable": {"thread_id": tenant_scoped_id(context, thread_id)}}
     sim = UserSimulator(scenario)
     history: list[dict] = []
     answer = ""
@@ -66,16 +73,22 @@ async def run_scenario(agent, scenario: dict) -> dict:
         print(f"  user> {user_msg}")
         history.append({"role": "user", "content": user_msg})
 
-        state = await agent.ainvoke({"messages": [("user", user_msg)]}, config)
+        with runtime_scope(context):
+            state = await agent.ainvoke({"messages": [("user", user_msg)]}, config)
         for _ in range(MAX_RESUMES):
             if not state.get("__interrupt__"):
                 break
             n = sum(len(i.value["action_requests"]) for i in state["__interrupt__"])
             print(f"  reviewer> {scenario['reviewer_decision']} ({n} action(s))")
-            state = await agent.ainvoke(
-                Command(resume={"decisions": [{"type": scenario["reviewer_decision"]}] * n}),
-                config,
-            )
+            with runtime_scope(context):
+                state = await agent.ainvoke(
+                    Command(
+                        resume={
+                            "decisions": [{"type": scenario["reviewer_decision"]}] * n
+                        }
+                    ),
+                    config,
+                )
         answer = str(state["messages"][-1].content)
         print(f"  kompass> {answer}")
         history.append({"role": "assistant", "content": answer})

@@ -1,5 +1,10 @@
 # Advanced Agentic Patterns (Frontier 2026)
 
+> **Status: conceptual and experimental notes.** This includes pseudocode and historical designs,
+> not a production-readiness claim. See [Enterprise runtime operations](enterprise_runtime.md).
+> The former custom HMAC A2A path was replaced by the official A2A 1.0 SDK with bearer-auth hooks,
+> and automatic lesson reinjection was replaced by quarantined, human-reviewed candidates.
+
 > **Scope.** This document catalogues the **Tier 2 and Tier 3** capabilities that separate a
 > production-grade agent from a demo. The [foundations](01_agentic_ai_deep_dive.md) (ReAct, tool
 > use, memory), [retrieval](02_retrieval_strategies.md), the [framework

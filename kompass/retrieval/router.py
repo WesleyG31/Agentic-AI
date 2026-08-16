@@ -14,11 +14,12 @@ from pydantic import BaseModel, Field
 from kompass.models.router import pick
 from kompass.retrieval import cag, graphrag, rag
 from kompass.retrieval.nl2sql import SCHEMA, run_sql
+from kompass.runtime import runtime_date
 
-CLASSIFY = f"""Route a query over ACME GmbH's knowledge to a retrieval strategy:
+CLASSIFY = """Route a query over ACME GmbH's knowledge to a retrieval strategy:
 - sql: facts about specific orders, tickets, employees, refunds, or aggregates. \
-Write ONE SQLite SELECT for this schema (dataset "today" is 2026-07-04):
-{SCHEMA}
+Write ONE SQLite SELECT for this schema (current date is {today}):
+{schema}
 - rag: a specific question answered by a policy/FAQ section (rules, prices, deadlines).
 - graph: multi-hop/relational questions spanning multiple policies or roles — \
 process + approver + timeline chained together (e.g. "for a damaged item over €500, \
@@ -45,7 +46,7 @@ def retrieve(query: str, k: int = 4) -> RetrievalResult:
     route: Route = (
         pick("fast")
         .with_structured_output(Route)
-        .invoke([("system", CLASSIFY), ("user", query)])
+        .invoke([("system", CLASSIFY.format(today=runtime_date(), schema=SCHEMA)), ("user", query)])
     )
 
     if route.strategy == "sql":
