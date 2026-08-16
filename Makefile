@@ -5,7 +5,7 @@
 PY ?= python
 
 .DEFAULT_GOAL := help
-.PHONY: help install seed demo evals test lint fmt ui api clean observability-init observability-up observability-down observability-logs prompts-sync dataset-sync
+.PHONY: help install seed demo evals evals-smoke release test test-security lint fmt ui api clean observability-init observability-up observability-down observability-logs prompts-sync dataset-sync
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -23,8 +23,17 @@ demo: ## Run the canonical end-to-end HITL demo (recorrido B)
 evals: ## Run the eval suite and regenerate the README metrics table
 	$(PY) -m evals.run
 
+evals-smoke: ## Run deterministic offline evaluation gates (no LLM/network)
+	$(PY) -m evals.offline --ci
+
+release: ## Verify and print the reproducible agent release identity
+	$(PY) -m kompass.release
+
 test: ## Run the test suite
 	$(PY) -m pytest
+
+test-security: ## Run deterministic authorization, trust, isolation, and action tests
+	$(PY) -m pytest tests/test_authorization.py tests/test_trust_boundary.py tests/test_memory.py tests/test_lessons.py tests/test_action_executor.py tests/test_a2a.py tests/test_mcp_v2.py
 
 lint: ## Lint with ruff
 	$(PY) -m ruff check .

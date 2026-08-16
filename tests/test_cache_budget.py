@@ -16,9 +16,17 @@ def _ai(total_tokens: int) -> AIMessage:
 
 def test_cache_paraphrase_hits_unrelated_misses():
     cache.clear()
-    cache.store("How long is the refund window for returns?", "30 days from delivery.")
-    assert cache.lookup("What's the return period for a refund?") == "30 days from delivery."
-    assert cache.lookup("Who is the company CEO?") is None
+    cache.store(
+        "How long is the refund window for returns?",
+        "30 days from delivery.",
+        tenant_id="tenant-a",
+    )
+    assert (
+        cache.lookup("What's the return period for a refund?", tenant_id="tenant-a")
+        == "30 days from delivery."
+    )
+    assert cache.lookup("Who is the company CEO?", tenant_id="tenant-a") is None
+    assert cache.lookup("What's the return period for a refund?", tenant_id="tenant-b") is None
     cache.clear()
 
 

@@ -40,7 +40,7 @@ def _collection() -> chromadb.Collection:
     return client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine"})
 
 
-def lookup(question: str, threshold: float = 0.2) -> str | None:
+def lookup(question: str, *, tenant_id: str, threshold: float = 0.2) -> str | None:
     """Return a cached answer for a semantically-equivalent question, or None.
 
     `threshold` is a cosine distance (0 = identical); only matches at or below it hit.
@@ -51,18 +51,26 @@ def lookup(question: str, threshold: float = 0.2) -> str | None:
     col = _collection()
     if col.count() == 0:
         return None
-    hit = col.query(query_texts=[question], n_results=1)
+    hit = col.query(query_texts=[question], n_results=1, where={"tenant_id": tenant_id})
+    if not hit["ids"][0]:
+        return None
     if hit["distances"][0][0] <= threshold:
         return hit["metadatas"][0][0]["answer"]
     return None
 
 
-def store(question: str, answer: str) -> None:
+def store(question: str, answer: str, *, tenant_id: str) -> None:
     """Cache a READ-only answer keyed by its question. Caller guarantees no state change."""
     _collection().add(
         ids=[uuid4().hex],
         documents=[question],
-        metadatas=[{"answer": answer, "schema_version": CACHE_SCHEMA_VERSION}],
+        metadatas=[
+            {
+                "answer": answer,
+                "schema_version": CACHE_SCHEMA_VERSION,
+                "tenant_id": tenant_id,
+            }
+        ],
     )
 
 

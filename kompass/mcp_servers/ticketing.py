@@ -6,13 +6,13 @@ Arguments come from an LLM, so they are validated here (this is a trust boundary
 """
 
 import sqlite3
-from datetime import date
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
 from kompass.config import ROOT, settings
+from kompass.runtime import runtime_date
 
-mcp = FastMCP("acme-ticketing", log_level="WARNING")
+mcp = MCPServer("acme-ticketing", log_level="WARNING")
 
 
 def _db() -> sqlite3.Connection:
@@ -46,7 +46,7 @@ def create_refund(order_id: int, amount_eur: float, reason: str) -> str:
         conn.close()
         return f"Rejected: {amount_eur} exceeds the order total of {order['total_eur']}"
 
-    today = date.today().isoformat()
+    today = runtime_date()
     cur = conn.execute(
         "INSERT INTO refunds (order_id, amount_eur, reason, status, requested_at, decided_at,"
         " approved_by) VALUES (?, ?, ?, 'approved', ?, ?, 'human-reviewer')",
@@ -67,7 +67,7 @@ def update_ticket(ticket_id: int, status: str, note: str) -> str:
         conn.close()
         return f"Rejected: ticket {ticket_id} does not exist"
 
-    resolved_at = date.today().isoformat() if status == "resolved" else None
+    resolved_at = runtime_date() if status == "resolved" else None
     conn.execute(
         "UPDATE tickets SET status = ?, resolved_at = COALESCE(?, resolved_at),"
         " body = body || char(10) || char(10) || '[Kompass] ' || ? WHERE id = ?",

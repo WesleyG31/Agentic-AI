@@ -1,6 +1,6 @@
 # Kompass — runtime dependencies (Python 3.11+).
 # Install:  python -m pip install -r requirements.txt
-# Pinned to floors known-good as of 2026-01.
+# Version floors reviewed against the official protocol/runtime releases on 2026-08-16.
 
 # ── Agent framework (LangGraph v1) ────────────────────────────────────
 langgraph>=1.0.0
@@ -9,7 +9,6 @@ langchain-core>=1.0.0
 langchain-openai>=0.3.0
 langchain-ollama>=1.0.0
 langgraph-checkpoint-sqlite>=2.0.0
-langchain-mcp-adapters>=0.1.0
 
 # ── Config & typed outputs ────────────────────────────────────────────
 pydantic>=2.9
@@ -28,8 +27,12 @@ streamlit>=1.38
 pandas>=2.2
 httpx>=0.27
 
-# ── Model Context Protocol (MCP tool servers) ─────────────────────────
-mcp>=1.0.0
+# ── Interoperability protocols ────────────────────────────────────────
+# MCP 2.x implements the current 2026 protocol line. The LangChain adapter still
+# pins MCP <2, so Kompass uses the official Client behind a small BaseTool bridge.
+mcp>=2.0.0,<3
+# Official A2A SDK, specification 1.0, with the existing FastAPI serving stack.
+a2a-sdk[fastapi]>=1.1.2,<2
 
 # ── Multi-modal ingestion ─────────────────────────────────────────────
 pillow>=10.4

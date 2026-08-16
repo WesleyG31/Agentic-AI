@@ -9,7 +9,7 @@ from kompass.config import Settings
 
 
 def test_version():
-    assert kompass.__version__ == "0.1.0"
+    assert kompass.__version__ == "3.0.0"
 
 
 def test_settings_defaults():

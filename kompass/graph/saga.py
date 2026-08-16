@@ -10,12 +10,12 @@ is the reliability pattern for agent actions that write to more than one system.
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
 from typing import Any
 
 from pydantic import BaseModel
 
 from kompass.config import ROOT, settings
+from kompass.runtime import runtime_date
 
 
 @dataclass
@@ -84,7 +84,7 @@ def refund_saga(
 
     def create_refund_do() -> int:
         conn = _db()
-        today = date.today().isoformat()
+        today = runtime_date()
         cur = conn.execute(
             "INSERT INTO refunds (order_id, amount_eur, reason, status, requested_at,"
             " decided_at, approved_by) VALUES (?, ?, ?, 'approved', ?, ?, 'saga-runner')",
@@ -110,7 +110,7 @@ def refund_saga(
         state["prev_resolved_at"] = row["resolved_at"]
         conn.execute(
             "UPDATE tickets SET status = 'resolved', resolved_at = ? WHERE id = ?",
-            (date.today().isoformat(), ticket_id),
+            (runtime_date(), ticket_id),
         )
         conn.commit()
         conn.close()

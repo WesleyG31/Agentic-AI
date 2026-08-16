@@ -4,7 +4,7 @@ Public entry points are added as slices land. For now this package exposes the
 version and the settings singleton.
 """
 
-__version__ = "0.1.0"
+__version__ = "3.0.0"
 
 from kompass.config import settings  # noqa: E402
 

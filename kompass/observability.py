@@ -10,13 +10,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from functools import lru_cache
-from typing import Any
+from typing import Any, Protocol
 
 from kompass.config import settings
+from kompass.runtime import get_runtime_context, tenant_scoped_id
+
+logger = logging.getLogger("kompass.telemetry")
+_SENSITIVE_KEYS = ("authorization", "token", "secret", "password", "credential", "api_key")
 
 
 def enabled() -> bool:
@@ -62,12 +69,104 @@ def _compact_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
     """Fit propagation attributes into OpenTelemetry's small baggage limits."""
     compact: dict[str, Any] = {}
     for key, value in metadata.items():
+        if any(marker in key.casefold() for marker in _SENSITIVE_KEYS):
+            compact[key] = "[redacted]"
+            continue
         encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
         if len(encoded) <= 180:
             compact[key] = value
         else:
             compact[f"{key}_sha256"] = hashlib.sha256(encoded.encode()).hexdigest()[:12]
     return compact
+
+
+def _export_payload(value: Any) -> Any:
+    """Export raw model/tool content only under an explicit operator policy."""
+    if settings.langfuse_capture_content:
+        return _mask_payload(value) if settings.langfuse_mask_pii else value
+    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    return {
+        "content_type": type(value).__name__,
+        "content_sha256": hashlib.sha256(encoded.encode()).hexdigest()[:16],
+        "content_bytes": len(encoded.encode()),
+    }
+
+
+def _safe_attributes(attributes: dict[str, Any] | None) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in (attributes or {}).items():
+        if any(marker in key.casefold() for marker in _SENSITIVE_KEYS):
+            result[key] = "[redacted]"
+        elif isinstance(value, (str, int, float, bool)) or value is None:
+            result[key] = value[:180] if isinstance(value, str) else value
+        else:
+            result[key] = type(value).__name__
+    return result
+
+
+@dataclass(frozen=True)
+class MetricPoint:
+    """Vendor-neutral metric event suitable for an OpenTelemetry adapter."""
+
+    name: str
+    value: float
+    unit: str
+    recorded_at: str
+    request_id: str | None
+    correlation_id: str | None
+    tenant_partition: str | None
+    attributes: dict[str, Any] = field(default_factory=dict)
+
+
+class TelemetrySink(Protocol):
+    def record(self, point: MetricPoint) -> None: ...
+
+
+class LoggingTelemetrySink:
+    def record(self, point: MetricPoint) -> None:
+        logger.info("metric", extra={"metric": point})
+
+
+class InMemoryTelemetrySink:
+    def __init__(self) -> None:
+        self.points: list[MetricPoint] = []
+
+    def record(self, point: MetricPoint) -> None:
+        self.points.append(point)
+
+
+_TELEMETRY: ContextVar[TelemetrySink | None] = ContextVar("kompass_telemetry", default=None)
+
+
+@contextmanager
+def telemetry_scope(sink: TelemetrySink) -> Iterator[TelemetrySink]:
+    token = _TELEMETRY.set(sink)
+    try:
+        yield sink
+    finally:
+        _TELEMETRY.reset(token)
+
+
+def record_metric(
+    name: str,
+    value: int | float,
+    *,
+    unit: str = "1",
+    attributes: dict[str, Any] | None = None,
+) -> MetricPoint:
+    context = get_runtime_context(required=False)
+    point = MetricPoint(
+        name=name,
+        value=float(value),
+        unit=unit,
+        recorded_at=(context.current_time if context else datetime.now(UTC)).isoformat(),
+        request_id=context.request_id if context else None,
+        correlation_id=context.correlation_id if context else None,
+        tenant_partition=(tenant_scoped_id(context, "telemetry")[:12] if context else None),
+        attributes=_safe_attributes(attributes),
+    )
+    (_TELEMETRY.get() or LoggingTelemetrySink()).record(point)
+    return point
 
 
 @dataclass
@@ -116,8 +215,8 @@ class AgentTrace:
         if self.span is not None:
             self.span.create_event(
                 name=name,
-                input=input,
-                output=output,
+                input=_export_payload(input),
+                output=_export_payload(output),
                 metadata=metadata,
                 level=level,
             )
@@ -158,7 +257,7 @@ def agent_trace(
             lf.start_as_current_observation(
                 name=name,
                 as_type=observation_type,
-                input=input,
+                input=_export_payload(input),
                 metadata=handle.metadata,
             ) as span,
         ):
@@ -176,7 +275,7 @@ def agent_trace(
                 )
                 raise
             else:
-                span.update(output=handle.output, metadata=handle.metadata)
+                span.update(output=_export_payload(handle.output), metadata=handle.metadata)
     finally:
         # Export is asynchronous. Flushing at the HTTP boundary makes a trace
         # visible immediately in a local demo and avoids losing short-lived CLI runs.

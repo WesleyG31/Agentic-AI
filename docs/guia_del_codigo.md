@@ -1,5 +1,10 @@
 # 🧭 Guía del código de Kompass (español)
 
+> **Estado: mapa histórico.** Varias tablas describen la implementación anterior. Para el contrato
+> actual usa [enterprise_runtime.md](enterprise_runtime.md), el README y
+> [threat_model.md](threat_model.md). A2A usa el SDK oficial 1.0 y autenticación bearer (no HMAC),
+> MCP usa el SDK oficial 2.x, la fecha llega por `RuntimeContext`, y las lecciones requieren revisión.
+
 > **Para qué sirve este documento.** Es el **mapa de navegación del código**: explica en
 > español qué es Kompass, qué hace y qué resuelve, y —sobre todo— **dónde vive cada cosa**
 > para que entiendas el repo rápido. Los demás documentos de [`docs/`](.) son teoría (en
@@ -185,16 +190,16 @@ Tres servidores FastMCP que corren como **subprocesos stdio**, lanzados por `mcp
 
 | Archivo | Qué hace | Símbolos clave | Cómo se cablea |
 |---|---|---|---|
-| [`a2a/card.py`](../kompass/a2a/card.py) | Genera y firma la Agent Card pública (identidad A2A) | `agent_card()`, `sign()` (HMAC-SHA256), `verify()` | La usan `server.py` (publicar) y `client.py` (verificar); secreto = `settings.a2a_secret` |
-| [`a2a/server.py`](../kompass/a2a/server.py) | Expone a Kompass como agente especialista invocable por otros agentes | `GET /.well-known/agent.json`, `POST /a2a` (JSON-RPC `tasks/send`) | App FastAPI standalone (puerto 8030); reusa el worker `research` (solo lectura → sin HITL) |
-| [`a2a/client.py`](../kompass/a2a/client.py) | CLI que descubre el peer, verifica la firma y delega una tarea | `discover()`, `send_task()` | `python -m kompass.a2a.client "<pregunta>"` (con el server corriendo) |
+| [`a2a/card.py`](../kompass/a2a/card.py) | Genera la Agent Card oficial 1.0 y publica sus requisitos de seguridad | `agent_card()` | La autenticidad depende de TLS/OIDC del despliegue; la tarjeta pública no otorga confianza por sí sola |
+| [`a2a/server.py`](../kompass/a2a/server.py) | Expone al especialista con ciclo de tarea, streaming y cancelación | `build_app()`, `KompassResearchExecutor` | SDK oficial, JSON-RPC + HTTP/JSON, tenant desde el principal verificado |
+| [`a2a/client.py`](../kompass/a2a/client.py) | Descubre la tarjeta e invoca/cancela/consulta una tarea | `send_task()`, `cancel_task()`, `get_task()` | Autenticación bearer; salida remota cruza `TrustBoundary` |
 
 ### 6.5 Memoria — [`kompass/memory/`](../kompass/memory)
 
 | Archivo | Qué hace | Símbolos clave | Cómo se cablea |
 |---|---|---|---|
 | [`memory/store.py`](../kompass/memory/store.py) | Memoria de largo plazo por usuario (hechos duraderos), cross-thread, en SQLite | `save_memory` (@tool), `recall_memories` (@tool), `kompass_memory.db` | Se registran como tools del agente en `build_agent` |
-| [`memory/lessons.py`](../kompass/memory/lessons.py) | Auto-mejora: destila una lección al resolver una acción y reinyecta las relevantes | `LessonsMiddleware`, `distill_lesson()`, `relevant_lessons()`, `_ACTION_TOOLS`, `_DUPLICATE_SIMILARITY=0.8` | Middleware en `build_agent`; retrieval embedding-free (Jaccard); `kompass_lessons.db` |
+| [`memory/lessons.py`](../kompass/memory/lessons.py) | Destila candidatos de lección en cuarentena; solo inyecta los revisados | `LessonsMiddleware`, `approve_lesson()`, `relevant_lessons()` | `memory:approve`, tenant/usuario y política anti-envenenamiento |
 
 *(La memoria de **corto plazo** no es un archivo: es el **checkpointer** por hilo, que guarda el historial de mensajes.)*
 
@@ -308,7 +313,7 @@ resueltos por `init_chat_model`, así que **cambiar de proveedor es editar `.env
 | `sqlite_checkpoint` | `KOMPASS_SQLITE_CHECKPOINT` | `kompass_checkpoints.db` | persistencia durable local de HITL |
 | `langfuse_enabled` / `langfuse_base_url` | `LANGFUSE_ENABLED` / `LANGFUSE_BASE_URL` | `false` / `http://localhost:3000` | observabilidad visual opcional |
 | `api_host` / `api_port` | `KOMPASS_API_HOST` / `KOMPASS_API_PORT` | `0.0.0.0` / `8000` | superficie API |
-| `a2a_secret` / `a2a_port` | `KOMPASS_A2A_SECRET` / `KOMPASS_A2A_PORT` | `dev-secret-change-me` / `8030` | firma HMAC y puerto del server A2A |
+| `a2a_dev_token` / `a2a_port` | `KOMPASS_A2A_DEV_TOKEN` / `KOMPASS_A2A_PORT` | vacío / `8030` | adaptador bearer local (deshabilitado si está vacío) y puerto A2A |
 | `trigger_port` | `KOMPASS_TRIGGER_PORT` | `8040` | puerto del webhook de triggers |
 | — (requerida) | `OPENAI_API_KEY` | — | credencial del proveedor de modelos |
 
@@ -379,7 +384,7 @@ Orden sugerido para entenderlo en una sentada:
 - **`.env.example`** dice en un comentario "Only ANTHROPIC_API_KEY is required", pero la variable
   realmente requerida es **`OPENAI_API_KEY`** (y los modelos default son `openai:*`).
 - **Versiones de Python:** el `Dockerfile` usa 3.12 pero el CI y `ruff.toml` apuntan a 3.11.
-- **Fecha "hoy" = 2026-07-04** está *hardcodeada* en los prompts (router, system prompt); no lee la fecha real.
+- **Fecha dinámica:** `RuntimeContext` aporta hora, zona y locale; los tests congelan el reloj.
 - **`lru_cache`** en índices (`rag._index`, `cag.full_corpus`, `graphrag._graph`): si el corpus cambia
   en disco, no se relee hasta reiniciar el proceso.
 - **Windows / cp1252:** varios scripts hacen `sys.stdout.reconfigure(encoding="utf-8")` para no romper con emojis.

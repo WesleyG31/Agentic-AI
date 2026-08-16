@@ -1,0 +1,6 @@
+# Optional deployment adapter. Not needed by local development or deterministic CI.
+-r requirements.txt
+
+# Official LangGraph PostgreSQL checkpointer and its maintained driver/pool.
+langgraph-checkpoint-postgres>=3.1.2,<4
+psycopg[binary,pool]>=3.2,<4

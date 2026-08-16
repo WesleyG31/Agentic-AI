@@ -21,6 +21,10 @@ jobs:
         run: ruff check .
       - name: Test
         run: pytest -q
+      - name: Offline agent evaluation gate
+        run: python -m evals.offline --ci
+      - name: Verify release identity
+        run: python -m kompass.release
 
   # Runs the eval suite on a fixed golden set and fails if the score
   # regresses below the committed threshold. Produces the README badge.

@@ -62,6 +62,18 @@ class Settings(BaseSettings):
     agent_mode: str = Field(default="single", alias="KOMPASS_AGENT_MODE")
     # Per-run token cap enforced by TokenBudgetMiddleware (runaway-loop backstop).
     token_budget: int = Field(default=200_000, alias="KOMPASS_TOKEN_BUDGET")
+    environment: Literal["development", "test", "staging", "production"] = Field(
+        default="development", alias="KOMPASS_ENVIRONMENT"
+    )
+
+    # Request defaults are for the local identity adapter only. Production identity and
+    # tenant values must come from verified OAuth/OIDC claims at the ingress boundary.
+    auth_mode: Literal["local", "oidc"] = Field(default="local", alias="KOMPASS_AUTH_MODE")
+    default_tenant_id: str = Field(default="local", alias="KOMPASS_DEFAULT_TENANT_ID")
+    default_timezone: str = Field(default="Europe/Berlin", alias="KOMPASS_DEFAULT_TIMEZONE")
+    default_locale: str = Field(default="en-US", alias="KOMPASS_DEFAULT_LOCALE")
+    oidc_issuer_url: str = Field(default="", alias="KOMPASS_OIDC_ISSUER_URL")
+    oidc_audience: str = Field(default="", alias="KOMPASS_OIDC_AUDIENCE")
 
     # ── Retrieval ─────────────────────────────────────────────────────
     chroma_path: str = Field(default=".chroma", alias="KOMPASS_CHROMA_PATH")
@@ -71,6 +83,25 @@ class Settings(BaseSettings):
     sqlite_checkpoint: str = Field(
         default="kompass_checkpoints.db", alias="KOMPASS_SQLITE_CHECKPOINT"
     )
+    checkpoint_postgres_dsn: str = Field(default="", alias="KOMPASS_CHECKPOINT_POSTGRES_DSN")
+    execution_store_db: str = Field(
+        default=".runtime/executions.db", alias="KOMPASS_EXECUTION_STORE_DB"
+    )
+    execution_max_concurrency: int = Field(
+        default=8, alias="KOMPASS_EXECUTION_MAX_CONCURRENCY"
+    )
+    execution_queue_capacity: int = Field(
+        default=32, alias="KOMPASS_EXECUTION_QUEUE_CAPACITY"
+    )
+    execution_deadline_seconds: float = Field(
+        default=120.0, alias="KOMPASS_EXECUTION_DEADLINE_SECONDS"
+    )
+    execution_max_attempts: int = Field(default=2, alias="KOMPASS_EXECUTION_MAX_ATTEMPTS")
+    action_receipts_db: str = Field(
+        default=".runtime/action_receipts.db", alias="KOMPASS_ACTION_RECEIPTS_DB"
+    )
+    action_timeout_seconds: float = Field(default=30.0, alias="KOMPASS_ACTION_TIMEOUT_SECONDS")
+    action_max_attempts: int = Field(default=2, alias="KOMPASS_ACTION_MAX_ATTEMPTS")
 
     # ── Observability ─────────────────────────────────────────────────
     langfuse_enabled: bool = Field(default=False, alias="LANGFUSE_ENABLED")
@@ -83,6 +114,7 @@ class Settings(BaseSettings):
     langfuse_environment: str = Field(default="development", alias="LANGFUSE_TRACING_ENVIRONMENT")
     langfuse_release: str = Field(default="local", alias="LANGFUSE_RELEASE")
     langfuse_mask_pii: bool = Field(default=True, alias="LANGFUSE_MASK_PII")
+    langfuse_capture_content: bool = Field(default=False, alias="LANGFUSE_CAPTURE_CONTENT")
     # Ollama is free locally. Hosted-provider prices are explicit configuration
     # because vendor price lists change independently from this repository.
     input_cost_per_million: float = Field(default=0.0, alias="KOMPASS_INPUT_COST_PER_MILLION")
@@ -93,15 +125,43 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, alias="KOMPASS_API_PORT")
 
     # ── A2A ───────────────────────────────────────────────────────────
-    # Agent-to-agent surface (kompass/a2a): the card-signing secret and the
-    # port the standalone A2A server listens on.
-    a2a_secret: str = Field(default="dev-secret-change-me", alias="KOMPASS_A2A_SECRET")
+    # A2A 1.0 surface. The dev token adapter is disabled when the token is blank;
+    # production deployments replace it with an OAuth/OIDC-verifying ingress.
     a2a_port: int = Field(default=8030, alias="KOMPASS_A2A_PORT")
+    a2a_base_url: str = Field(default="http://localhost:8030", alias="KOMPASS_A2A_BASE_URL")
+    a2a_bearer_token: str = Field(default="", alias="KOMPASS_A2A_BEARER_TOKEN")
+    a2a_dev_token: str = Field(default="", alias="KOMPASS_A2A_DEV_TOKEN")
+    a2a_dev_subject: str = Field(default="local-a2a-client", alias="KOMPASS_A2A_DEV_SUBJECT")
+    a2a_dev_tenant: str = Field(default="local", alias="KOMPASS_A2A_DEV_TENANT")
+    a2a_dev_scopes: str = Field(default="research:read", alias="KOMPASS_A2A_DEV_SCOPES")
+    a2a_timeout_seconds: float = Field(default=60.0, alias="KOMPASS_A2A_TIMEOUT_SECONDS")
+    a2a_max_concurrency: int = Field(default=4, alias="KOMPASS_A2A_MAX_CONCURRENCY")
+
+    # MCP local stdio remains the default. Set a URL/token to use the production-oriented
+    # Streamable HTTP resource-server path instead.
+    mcp_remote_url: str = Field(default="", alias="KOMPASS_MCP_REMOTE_URL")
+    mcp_bearer_token: str = Field(default="", alias="KOMPASS_MCP_BEARER_TOKEN")
+    mcp_timeout_seconds: float = Field(default=30.0, alias="KOMPASS_MCP_TIMEOUT_SECONDS")
+    mcp_http_host: str = Field(default="127.0.0.1", alias="KOMPASS_MCP_HTTP_HOST")
+    mcp_http_port: int = Field(default=8050, alias="KOMPASS_MCP_HTTP_PORT")
+    mcp_dev_token: str = Field(default="", alias="KOMPASS_MCP_DEV_TOKEN")
+    mcp_dev_subject: str = Field(default="local-mcp-client", alias="KOMPASS_MCP_DEV_SUBJECT")
+    mcp_dev_tenant: str = Field(default="local", alias="KOMPASS_MCP_DEV_TENANT")
+    mcp_dev_scopes: str = Field(
+        default=(
+            "mcp:invoke documents:read operations:read tickets:read "
+            "refunds:create tickets:write"
+        ),
+        alias="KOMPASS_MCP_DEV_SCOPES",
+    )
+    mcp_issuer_url: str = Field(default="", alias="KOMPASS_MCP_ISSUER_URL")
+    mcp_resource_url: str = Field(default="", alias="KOMPASS_MCP_RESOURCE_URL")
 
     # ── Triggers ──────────────────────────────────────────────────────
     # Event-driven surface (kompass/triggers): the port the standalone
     # webhook app listens on.
     trigger_port: int = Field(default=8040, alias="KOMPASS_TRIGGER_PORT")
+    trigger_bearer_token: str = Field(default="", alias="KOMPASS_TRIGGER_BEARER_TOKEN")
 
 
 settings = Settings()

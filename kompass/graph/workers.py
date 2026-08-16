@@ -8,16 +8,32 @@ stay with the supervisor.
 """
 
 import asyncio
+import re
 
 from langchain.agents import create_agent
 from langchain_core.tools import tool
 
 from kompass.models.router import pick
+from kompass.research.workflow import (
+    ResearchBudget,
+    ResearchSource,
+    ResearchWorkflow,
+    retrieved_at,
+    source_id,
+)
 from kompass.retrieval.nl2sql import SCHEMA
+from kompass.security.middleware import (
+    AuthorizationMiddleware,
+    RuntimeContextMiddleware,
+    ToolTrustMiddleware,
+)
+from kompass.security.trust import ContentOrigin
 
 READ_TOOLS = {"search_docs", "get_schema", "query_database"}
 
-RESEARCHER_PROMPT = f"""You are ACME GmbH's research specialist. Today is 2026-07-04.
+RESEARCHER_PROMPT = f"""You are ACME GmbH's research specialist.
+
+The application supplies current time and locale through trusted runtime context.
 
 You answer research questions, nothing else — never take actions or promise them.
 Reply in the user's language. The policy/FAQ corpus is English; translate non-English policy
@@ -40,7 +56,41 @@ async def _build_researcher():
     from kompass.graph.agent import mcp_client  # here to avoid a circular import
 
     tools = [t for t in await mcp_client().get_tools() if t.name in READ_TOOLS]
-    return create_agent(model=pick("balanced"), tools=tools, system_prompt=RESEARCHER_PROMPT)
+    return create_agent(
+        model=pick("balanced"),
+        tools=tools,
+        system_prompt=RESEARCHER_PROMPT,
+        middleware=[
+            RuntimeContextMiddleware(),
+            AuthorizationMiddleware(capabilities=READ_TOOLS),
+            ToolTrustMiddleware(),
+        ],
+    )
+
+
+class _AgentSourceProvider:
+    name = "kompass-read-specialist"
+
+    def __init__(self, worker) -> None:
+        self._worker = worker
+
+    async def search(self, query: str, limit: int) -> list[ResearchSource]:
+        result = await self._worker.ainvoke({"messages": [("user", query)]})
+        content = str(result["messages"][-1].content)
+        citations = re.findall(r"\[([^\]]+)\]", content)
+        provenance = ", ".join(dict.fromkeys(citations)) or f"agent-query:{query}"
+        return [
+            ResearchSource(
+                source_id=source_id(self.name, provenance),
+                title=f"Read-only specialist result: {query[:80]}",
+                content=content,
+                provenance=provenance,
+                provider=self.name,
+                retrieved_at=retrieved_at(),
+                credibility=0.8 if citations else 0.4,
+                origin=ContentOrigin.TOOL,
+            )
+        ][:limit]
 
 
 @tool
@@ -52,5 +102,14 @@ async def research(question: str) -> str:
     async with _lock:
         if _worker is None:
             _worker = await _build_researcher()
-    result = await _worker.ainvoke({"messages": [("user", question)]})
-    return result["messages"][-1].content
+    workflow = ResearchWorkflow(
+        [_AgentSourceProvider(_worker)],
+        budget=ResearchBudget(
+            max_queries=3,
+            max_sources=3,
+            max_parallelism=2,
+            timeout_seconds=30.0,
+        ),
+    )
+    result = await workflow.run(question)
+    return result.answer

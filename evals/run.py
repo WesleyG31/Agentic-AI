@@ -16,7 +16,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
 from evals import baseline
@@ -25,9 +24,12 @@ from evals.judge import judge
 from kompass.config import ROOT, settings
 from kompass.graph.agent import build_agent
 from kompass.observability import agent_trace, client, token_usage
+from kompass.persistence import checkpoint_saver
 from kompass.prompts import prompt_manifest
 from kompass.retrieval.nl2sql import run_sql
+from kompass.runtime import RuntimeContext, runtime_scope, tenant_scoped_id
 from kompass.scripts.seed import build_db
+from kompass.security.identity import TOOL_SCOPES
 
 RESULTS = ROOT / "evals" / "results"
 REGRESSION = ROOT / "evals" / "regression_baseline.json"
@@ -37,14 +39,22 @@ MAX_RESUMES = 5
 async def agent_episode(agent, item: dict) -> dict:
     """Run one full graph episode, including scripted HITL decisions."""
     thread_id = f"eval-{item['id']}-{uuid4().hex[:8]}"
-    base_config = {"configurable": {"thread_id": thread_id}}
+    context = RuntimeContext.create(
+        tenant_id="eval",
+        user_id="golden-regression-suite",
+        timezone_name=settings.default_timezone,
+        locale=settings.default_locale,
+        scopes=frozenset(TOOL_SCOPES.values()),
+        correlation_id=thread_id,
+    )
+    base_config = {"configurable": {"thread_id": tenant_scoped_id(context, thread_id)}}
     decision = (item.get("action") or {}).get("decision", "approve")
     t0 = time.monotonic()
 
-    with agent_trace(
+    with runtime_scope(context), agent_trace(
         name="kompass-evaluation-episode",
         thread_id=thread_id,
-        user_id="golden-regression-suite",
+        user_id=context.user_id,
         input={"case_id": item["id"], "question": item["question"]},
         tags=["evaluation", item["category"]],
         metadata={
@@ -190,7 +200,7 @@ def score(item: dict, episode: dict, action_ok: bool | None) -> dict:
 async def run_agent_system(items: list[dict]) -> dict[str, dict]:
     """Run read cases concurrently and isolate every side-effect case with a fresh DB."""
     episodes: dict[str, dict] = {}
-    async with AsyncSqliteSaver.from_conn_string(str(ROOT / settings.sqlite_checkpoint)) as saver:
+    async with checkpoint_saver() as saver:
         agent = await build_agent(saver)
         knowledge = [i for i in items if not i.get("action")]
         actions = [i for i in items if i.get("action")]
