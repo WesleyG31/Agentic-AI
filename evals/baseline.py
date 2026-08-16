@@ -11,6 +11,7 @@ import chromadb
 
 from kompass.config import ROOT, settings
 from kompass.models.router import pick
+from kompass.retrieval.chroma import local_chroma_settings
 
 PROMPT = """Answer the user's question using the context below.
 
@@ -23,9 +24,10 @@ Question: {question}"""
 @lru_cache
 def _collection() -> chromadb.Collection:
     # One shared client: chromadb's client creation is not thread-safe.
-    return chromadb.PersistentClient(path=str(ROOT / settings.chroma_path)).get_collection(
-        "acme_docs"
-    )
+    return chromadb.PersistentClient(
+        path=str(ROOT / settings.chroma_path),
+        settings=local_chroma_settings(),
+    ).get_collection("acme_docs")
 
 
 def answer(question: str) -> str:

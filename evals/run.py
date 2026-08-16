@@ -14,6 +14,7 @@ import math
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from langgraph.types import Command
@@ -372,12 +373,16 @@ def update_readme(table: str) -> None:
 async def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--case-id", action="append", dest="case_ids")
     parser.add_argument("--agent-only", action="store_true")
     parser.add_argument("--ci", action="store_true")
     parser.add_argument("--min-score", type=float)
+    parser.add_argument("--record-live-baseline", action="store_true")
     args = parser.parse_args()
+    if args.limit and args.case_ids:
+        parser.error("--limit and --case-id cannot be combined")
 
-    items = load_golden(args.limit)
+    items = load_golden(args.limit, args.case_ids)
     print(f"golden set: {len(items)} items")
     print("running agent episodes...")
     agent_eps = await run_agent_system(items)
@@ -430,6 +435,50 @@ async def main() -> int:
     result_path = RESULTS / "results.json"
     result_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
     print(f"results -> {result_path}")
+
+    if args.record_live_baseline:
+        live_path = ROOT / "evals" / "live_baseline.json"
+        live = {
+            "schema_version": 1,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "provider": settings.llm_provider,
+            "model": (
+                settings.ollama_model_balanced
+                if settings.llm_provider == "ollama"
+                else settings.model_balanced
+            ),
+            "case_ids": [item["id"] for item in items],
+            "aggregate": agent_agg,
+            "cases": [
+                {
+                    key: row[key]
+                    for key in (
+                        "id",
+                        "category",
+                        "task_success",
+                        "answer_correctness",
+                        "hallucination",
+                        "tool_selection",
+                        "tool_arguments_correct",
+                        "retrieval_relevance",
+                        "action_ok",
+                        "unsafe",
+                        "selected_tools",
+                        "latency_s",
+                        "tokens",
+                        "cost_usd",
+                        "notes",
+                    )
+                }
+                for row in agent_scored
+            ],
+            "review": {
+                "status": "candidate",
+                "method": "inspect each selected case and its observable trajectory",
+            },
+        }
+        live_path.write_text(json.dumps(live, indent=2), encoding="utf-8")
+        print(f"live baseline candidate -> {live_path}")
 
     if args.ci:
         failures = regression_failures(agent_agg, args.min_score)

@@ -10,7 +10,7 @@ async def test_run_inspection_fails_closed_in_oidc_mode(monkeypatch):
     monkeypatch.setattr(api_module.settings, "auth_mode", "oidc")
     with pytest.raises(HTTPException) as raised:
         await api_module.get_run("thread-1")
-    assert raised.value.status_code == 503
+    assert raised.value.status_code == 401
 
 
 def test_webhook_is_disabled_without_token(monkeypatch):

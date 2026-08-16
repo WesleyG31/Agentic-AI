@@ -39,7 +39,9 @@ class TraceHandler(BaseCallbackHandler):
 
     def on_llm_end(self, response: LLMResult, *, run_id, **kwargs):
         started, model, thread_id = self._runs.pop(run_id)
-        usage = getattr(response.generations[0][0].message, "usage_metadata", None) or {}
+        generation = response.generations[0][0]
+        message = getattr(generation, "message", None)
+        usage = getattr(message, "usage_metadata", None) or {}
         line = {
             "ts": time.time(),
             "thread_id": thread_id,

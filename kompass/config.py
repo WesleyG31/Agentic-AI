@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     default_locale: str = Field(default="en-US", alias="KOMPASS_DEFAULT_LOCALE")
     oidc_issuer_url: str = Field(default="", alias="KOMPASS_OIDC_ISSUER_URL")
     oidc_audience: str = Field(default="", alias="KOMPASS_OIDC_AUDIENCE")
+    # Optional transport overrides keep the externally visible issuer stable when the
+    # verifier runs inside Docker. They never replace issuer/audience validation.
+    oidc_discovery_url: str = Field(default="", alias="KOMPASS_OIDC_DISCOVERY_URL")
+    oidc_jwks_url: str = Field(default="", alias="KOMPASS_OIDC_JWKS_URL")
+    oidc_timeout_seconds: float = Field(default=5.0, alias="KOMPASS_OIDC_TIMEOUT_SECONDS")
+    oidc_clock_skew_seconds: int = Field(default=30, alias="KOMPASS_OIDC_CLOCK_SKEW_SECONDS")
+    max_request_bytes: int = Field(default=64_000, alias="KOMPASS_MAX_REQUEST_BYTES")
 
     # ── Retrieval ─────────────────────────────────────────────────────
     chroma_path: str = Field(default=".chroma", alias="KOMPASS_CHROMA_PATH")
@@ -84,6 +91,7 @@ class Settings(BaseSettings):
         default="kompass_checkpoints.db", alias="KOMPASS_SQLITE_CHECKPOINT"
     )
     checkpoint_postgres_dsn: str = Field(default="", alias="KOMPASS_CHECKPOINT_POSTGRES_DSN")
+    database_url: str = Field(default="", alias="KOMPASS_DATABASE_URL")
     execution_store_db: str = Field(
         default=".runtime/executions.db", alias="KOMPASS_EXECUTION_STORE_DB"
     )

@@ -15,6 +15,7 @@ import chromadb
 from langchain_core.messages import ToolMessage
 
 from kompass.config import ROOT, settings
+from kompass.retrieval.chroma import local_chroma_settings
 
 # v2 leaves the previous collection intact but makes its ungrounded entries
 # unreachable. Bump this schema when cache correctness rules materially change.
@@ -36,7 +37,10 @@ _UNRESOLVED_MARKERS = (
 
 
 def _collection() -> chromadb.Collection:
-    client = chromadb.PersistentClient(path=str(ROOT / settings.chroma_path))
+    client = chromadb.PersistentClient(
+        path=str(ROOT / settings.chroma_path),
+        settings=local_chroma_settings(),
+    )
     return client.get_or_create_collection(COLLECTION, metadata={"hnsw:space": "cosine"})
 
 
@@ -96,6 +100,12 @@ def can_store(messages: list, answer: str) -> bool:
 
 def clear() -> None:
     """Drop the cache if it exists (used by tests and demos)."""
-    client = chromadb.PersistentClient(path=str(ROOT / settings.chroma_path))
-    if any(c.name == COLLECTION for c in client.list_collections()):
+    client = chromadb.PersistentClient(
+        path=str(ROOT / settings.chroma_path),
+        settings=local_chroma_settings(),
+    )
+    if any(
+        (collection if isinstance(collection, str) else collection.name) == COLLECTION
+        for collection in client.list_collections()
+    ):
         client.delete_collection(COLLECTION)

@@ -17,6 +17,7 @@ from kompass.actions.executor import (
     ApprovalState,
     SQLiteReceiptStore,
 )
+from kompass.actions.postgres import PostgresReceiptStore
 from kompass.config import ROOT, settings
 from kompass.runtime import get_runtime_context
 from kompass.security.identity import LocalPolicyEngine, Principal
@@ -110,8 +111,13 @@ class ActionExecutionMiddleware(AgentMiddleware):
         ] = _compensate,
     ) -> None:
         receipt_path = str(ROOT / settings.action_receipts_db)
+        store = (
+            PostgresReceiptStore(settings.database_url)
+            if settings.database_url
+            else SQLiteReceiptStore(receipt_path)
+        )
         self._executor = executor or ActionExecutor(
-            LocalPolicyEngine(), SQLiteReceiptStore(receipt_path)
+            LocalPolicyEngine(), store
         )
         self._verifier = verifier
         self._compensator = compensator
@@ -129,6 +135,7 @@ class ActionExecutionMiddleware(AgentMiddleware):
                 status="error",
             )
         arguments = dict(request.tool_call.get("args", {}))
+        arguments.pop("idempotency_key", None)
         before = _snapshot(tool, arguments)
         original: ToolMessage | None = None
 
@@ -155,6 +162,9 @@ class ActionExecutionMiddleware(AgentMiddleware):
             resource=f"tool:{tool}",
             compensation_reference=f"kompass:{tool}:v1",
         )
+        # The target system receives the same key as the receipt store. Its own unique
+        # constraint is the final defense against timeout-after-commit duplicates.
+        request.tool_call.setdefault("args", {})["idempotency_key"] = action.idempotency_key
         receipt = await self._executor.execute_async(
             action,
             effect,

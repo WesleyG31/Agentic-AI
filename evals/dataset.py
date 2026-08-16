@@ -33,9 +33,17 @@ def expected_tools(item: dict) -> list[str]:
     return []
 
 
-def load_golden(limit: int | None = None) -> list[dict]:
+def load_golden(
+    limit: int | None = None, case_ids: list[str] | None = None
+) -> list[dict]:
     items = json.loads(GOLDEN.read_text(encoding="utf-8"))
     validate_golden(items)
+    if case_ids:
+        by_id = {item["id"]: item for item in items}
+        missing = sorted(set(case_ids) - by_id.keys())
+        if missing:
+            raise ValueError(f"unknown golden case ids: {missing}")
+        return [by_id[case_id] for case_id in case_ids]
     return items[:limit]
 
 
@@ -61,17 +69,17 @@ def tool_trajectory(messages: list[Any]) -> list[dict[str, Any]]:
     ordered: list[dict[str, Any]] = []
     for message in messages:
         for call in getattr(message, "tool_calls", ()) or ():
-            row = {
+            call_row = {
                 "name": call.get("name"),
                 "args": call.get("args", {}),
                 "result": None,
             }
-            calls[str(call.get("id", ""))] = row
-            ordered.append(row)
+            calls[str(call.get("id", ""))] = call_row
+            ordered.append(call_row)
         if isinstance(message, ToolMessage):
-            row = calls.get(str(message.tool_call_id))
-            if row is None:
-                row = {"name": message.name, "args": {}, "result": None}
-                ordered.append(row)
-            row["result"] = str(message.content)[:3_000]
+            result_row = calls.get(str(message.tool_call_id))
+            if result_row is None:
+                result_row = {"name": message.name, "args": {}, "result": None}
+                ordered.append(result_row)
+            result_row["result"] = str(message.content)[:3_000]
     return ordered

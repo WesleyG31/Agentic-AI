@@ -46,6 +46,25 @@ async def checkpoint_saver() -> AsyncIterator[Any]:
         yield saver
 
 
+def register_workflow_thread(context: RuntimeContext, storage_thread_id: str) -> None:
+    """Persist an RLS-protected tenant owner for PostgreSQL-backed checkpoints."""
+    if not settings.database_url:
+        return
+    try:
+        import psycopg
+    except ModuleNotFoundError as exc:  # pragma: no cover - packaging guard
+        raise RuntimeError("PostgreSQL workflow ownership requires psycopg") from exc
+    with psycopg.connect(settings.database_url) as conn, conn.transaction():
+        conn.execute(
+            "SELECT set_config('app.current_tenant', %s, true)", (context.tenant_id,)
+        )
+        conn.execute(
+            "INSERT INTO workflow_threads (tenant_id, user_id, storage_thread_id) "
+            "VALUES (%s, %s, %s) ON CONFLICT (tenant_id, storage_thread_id) DO NOTHING",
+            (context.tenant_id, context.user_id.casefold(), storage_thread_id),
+        )
+
+
 class ExecutionStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"

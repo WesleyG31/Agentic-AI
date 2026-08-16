@@ -10,6 +10,7 @@ from pathlib import Path
 import chromadb
 
 from kompass.config import ROOT, settings
+from kompass.retrieval.chroma import local_chroma_settings
 
 CORPUS = ROOT / "corpus"
 COLLECTION = "acme_docs"
@@ -41,8 +42,14 @@ def chunk(doc: Path) -> list[tuple[str, str]]:
 
 def build_index(chroma_path: str | Path | None = None) -> int:
     """Index all corpus markdown into a fresh Chroma collection. Returns the chunk count."""
-    client = chromadb.PersistentClient(path=str(chroma_path or settings.chroma_path))
-    if any(c.name == COLLECTION for c in client.list_collections()):
+    client = chromadb.PersistentClient(
+        path=str(chroma_path or settings.chroma_path),
+        settings=local_chroma_settings(),
+    )
+    if any(
+        (collection if isinstance(collection, str) else collection.name) == COLLECTION
+        for collection in client.list_collections()
+    ):
         client.delete_collection(COLLECTION)
     collection = client.create_collection(COLLECTION)
 

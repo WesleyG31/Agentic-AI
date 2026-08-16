@@ -41,7 +41,9 @@ class ClaimsIdentityAdapter:
         tenant = str(claims.get("tenant_id") or claims.get("tid") or "").strip()
         if not subject or not tenant:
             raise ValueError("verified claims require sub and tenant_id/tid")
-        raw_scopes = claims.get("scope", claims.get("scp", ""))
+        raw_scopes = claims.get(
+            "permissions", claims.get("scope", claims.get("scp", ""))
+        )
         scopes = (
             frozenset(str(raw_scopes).split())
             if isinstance(raw_scopes, str)

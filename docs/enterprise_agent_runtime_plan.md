@@ -1,38 +1,40 @@
-# Enterprise Agent Runtime implementation ledger
+# Agent runtime implementation ledger
 
-Status vocabulary is exact: `DONE`, `PARTIAL`, `BLOCKED_MANUAL`, `DEFERRED_WITH_REASON`.
-`DONE` means implementation and deterministic tests exist. `PARTIAL` identifies a concrete boundary,
-not aspirational scaffolding.
+Status vocabulary is exact: `DONE`, `PARTIAL`, `DEFERRED_WITH_REASON`. `DONE` means code and
+reproducible tests exist for the stated local scope; it does not imply an internet-facing deployment.
 
-Baseline: clean `main` at `deb0760`; implementation branch
-`feat/enterprise-agent-runtime`. Baseline lint passed and the initial focused 26-test set passed.
+Baseline commit: `efa1ade` on `feat/enterprise-agent-runtime`. This continuation closes the five
+previously open local validation areas without cloud or paid services.
 
-| Area | Status | Evidence and boundary |
+| Area | Status | Evidence and exact boundary |
 |---|---:|---|
-| Runtime context and injectable clock | DONE | `kompass/runtime.py`; request time/locale/identity/tenant/correlation propagation and temporal tests |
-| Trust boundary / indirect injection | DONE | origin/trust/provenance envelopes, deterministic memory/policy restrictions, audit events, adversarial tests |
-| Identity and authorization | PARTIAL | claims adapter and deny-by-default policy are implemented; real OIDC token verification is `BLOCKED_MANUAL` and OIDC API mode fails closed |
-| Multi-tenancy | PARTIAL | memory, lessons, cache, checkpoints, A2A tasks, receipts, execution failures are scoped; synthetic ACME DB is a single-tenant fixture and production RLS is manual |
-| Transactional actions | DONE | authorization, approval, idempotency, timeout/retry, verification, compensation, receipt/audit and deterministic failure-path tests |
-| A2A modernization | PARTIAL | official SDK/spec 1.0 lifecycle, streaming, cancellation, auth hook and isolation tests; distributed task persistence/TLS/OIDC are external |
-| MCP enterprise path | PARTIAL | official SDK 2.x stdio/Streamable HTTP, tools/resources, auth/scope/deadline/audit tests; production OAuth/TLS is external |
-| Memory governance | DONE | tenant/user, type, provenance, trust, TTL, confidence, deletion; procedural candidates quarantined pending authorized review |
-| Durable/distributed execution | PARTIAL | durable local checkpoints/execution records plus official PostgreSQL checkpoint adapter; distributed queue/leases/backpressure require platform integration |
-| Agentic research | DONE | bounded plan/gather/normalize/dedupe/disagreement/evidence workflow with fixture failure/deadline tests |
-| Evaluation platform V2 | DONE | result schema, observable trajectory, deterministic state predicates, safety/tenant/action metrics and offline CI gate; live judge remains opt-in |
-| Observability | PARTIAL | vendor-neutral audit/metric ports and optional Langfuse with content-off default; exporter/alerts/retention are external |
-| Release governance | DONE | versioned descriptor, prompt/model/tool/policy/protocol/dataset identity, deterministic release ID and documented promotion/rollback |
-| Experiments vs core | DONE | README classifies debate/CAG/GraphRAG/multimodal/sandbox/framework spikes; production assembly does not import them |
-| Threat model | DONE | concrete threat/mitigation/test/residual-risk register and OWASP Agentic Top 10 mapping |
-| README and configuration | DONE | architecture, core/experimental split, honest capability matrix, operational boundaries, blank-secret `.env.example` |
-| External identity and infrastructure | BLOCKED_MANUAL | OIDC provider/gateway, TLS/DNS, secrets, production PostgreSQL/RLS/backup, distributed task/execution persistence, telemetry backend |
-| Distributed queue implementation | DEFERRED_WITH_REASON | no queue framework added: workload/SLO/platform requirements are unknown, and SQLite reference plus bounded protocol/action paths cover deterministic local development |
+| Runtime context and trust boundary | DONE | request clock/identity/tenant/correlation, trust/provenance envelopes and adversarial tests |
+| OIDC ingress | DONE | Keycloak 26.7 Compose realm; discovery/JWKS/signature/issuer/audience/expiry/claim verifier and real integration tests |
+| Deterministic authorization | DONE | deny-by-default scopes, tenant equality and agent capability constraints independent of prompts |
+| Runtime multi-tenancy | DONE | forced PostgreSQL RLS for receipts/thread ownership; own/cross/missing/admin integration tests; ACME domain fixture explicitly single organization |
+| PostgreSQL checkpoints | DONE | PostgreSQL 17 Compose, migration, official `AsyncPostgresSaver.setup()`, real graph persistence and tenant-key test |
+| Transactional actions | DONE | authorization, approval, atomic payload-bound claim, retry/deadline, verification, compensation and audit |
+| Target idempotency | DONE | unique ACME business-effect key in the same transaction; exact replay, payload conflict and concurrent worker tests |
+| Reconciliation | DONE | tenant CLI detects committed/missing effects, verifies or safely repairs, converges on repeated runs |
+| Security validation | DONE | 72-case focused pack plus Keycloak/PostgreSQL integration and dependency audit |
+| Load validation | DONE | reproducible 100-request local OIDC/PostgreSQL scenario; committed metrics report |
+| Evaluation platform V2 | DONE | deterministic CI gate plus reviewed five-category local Ollama baseline with zero configured cost |
+| MCP 2.x / A2A 1.0 | DONE | official SDK contracts, scoped auth hooks, lifecycle, timeouts and isolation within local scope |
+| Governed memory and bounded research | DONE | tenant/user/provenance/TTL/review controls and bounded evidence workflow |
+| Observability | DONE | vendor-neutral local audit/metrics and content-off optional Langfuse; no backend required |
+| Release governance | DONE | release descriptor, dataset/prompt/tool/policy identity and deterministic release check |
+| Chroma dependency mitigation | DONE | CVE-2026-45829 avoided by embedded-only Chroma 0.6.3 constraint; rebuilt index and zero-vulnerability audit |
+| Distributed queue / multi-process leases | DEFERRED_WITH_REASON | current local single-process workload needs neither; bounded admission and durable receipts cover actual scope |
 
-## Phase completion notes
+## Local architecture decisions
 
-- Existing LangGraph, HITL, golden-set judge, red-team, saga, and Langfuse work was preserved.
-- Custom HMAC/hand-written A2A transport was replaced by the official SDK rather than maintained in
-  parallel. The former `langchain-mcp-adapters` dependency was removed because its MCP-major pin was
-  incompatible with the official 2.x SDK path.
-- Live LLM evaluation, public-network tests, production migrations, and deployments are intentionally
-  not part of deterministic development validation.
+- Exactly three Compose services: app, PostgreSQL and Keycloak. Keycloak uses embedded storage so a
+  second database service is unnecessary.
+- PostgreSQL is used where transactions/RLS are required: action receipts and workflow ownership.
+  SQLite remains the simple target fixture and optional no-Docker checkpoint/memory adapter.
+- Tenant RLS uses the non-owner `kompass_app` role and `FORCE ROW LEVEL SECURITY`; checkpointer schema
+  setup deliberately uses the local migration/admin connection because the official schema has no
+  tenant column. Opaque tenant/user-derived thread IDs plus the RLS ownership registry protect that
+  boundary.
+- Reconciliation is an executable command, not a scheduler or queue.
+- Mandatory development/testing never enables OpenAI, hosted Langfuse or another paid dependency.

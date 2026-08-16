@@ -35,7 +35,7 @@ business state, and recorded as receipts.
 - Request-scoped clock, locale, identity, tenant, scopes, request ID, and correlation ID.
 - Deny-by-default tool policy and explicit capability limits independent of prompts.
 - Provenance-tagged trust boundaries for user, document, tool, MCP, A2A, and memory content.
-- Durable LangGraph HITL checkpoints: SQLite locally; optional PostgreSQL adapter for deployment.
+- Durable LangGraph HITL checkpoints: SQLite for the smallest setup or PostgreSQL 17 in Compose.
 - Action transaction layer with approval state, idempotency, deadlines, bounded retry,
   effect verification, compensation hooks, and structured audit events.
 - Official MCP 2.x client/server over stdio or Streamable HTTP, including resources and scopes.
@@ -65,16 +65,17 @@ These remain useful demonstrations but are not imported by the production agent 
 
 | Capability | Status | Boundary |
 |---|---|---|
-| Runtime context, trust policy, local authorization engine | IMPLEMENTED | OIDC claims must be verified by deployment ingress |
+| Runtime context, trust policy, local authorization engine | IMPLEMENTED | Local mode is development-only; Compose uses real Keycloak OIDC |
 | HITL and transactional actions | IMPLEMENTED | ACME effect adapter is a deterministic local system |
 | MCP stdio and Streamable HTTP | IMPLEMENTED | Production OAuth issuer/resource configuration required remotely |
 | A2A 1.0 lifecycle and auth hook | IMPLEMENTED | Distributed task persistence and production token verification require infrastructure |
-| Tenant memory, cache, checkpoints, receipts | IMPLEMENTED | ACME source database is a single-tenant fixture |
-| PostgreSQL checkpoint path | REQUIRES EXTERNAL INFRA | Optional package, database, migrations, TLS, backup/restore |
-| Bounded research and offline eval V2 | IMPLEMENTED | Public-web/live-model evaluation remains opt-in |
+| Tenant memory, cache, checkpoints, receipts | IMPLEMENTED | PostgreSQL receipt/thread tables use forced RLS; ACME business data is a single-tenant fixture |
+| PostgreSQL checkpoint path | IMPLEMENTED LOCALLY | PostgreSQL 17 + official saver + migrations and integration tests in Compose |
+| OIDC ingress | IMPLEMENTED LOCALLY | Keycloak 26.7 discovery, JWKS, signature, issuer, audience, expiry and tenant/scopes |
+| Bounded research and evaluation V2 | IMPLEMENTED | Offline gate plus reviewed five-category Ollama baseline |
 | Langfuse observability | REQUIRES EXTERNAL INFRA | Local no-op and vendor-neutral boundaries work without it |
 | Debate, CAG, GraphRAG, multimodal, framework spike | EXPERIMENTAL | Excluded from production assembly |
-| Production OIDC, secrets, TLS/DNS, database RLS | REQUIRES EXTERNAL INFRA | Fail-closed placeholders only |
+| Local RLS, idempotency and reconciliation | IMPLEMENTED | Forced tenant RLS, atomic claims, target unique keys and repeatable CLI repair |
 
 ## Quickstart
 
@@ -96,7 +97,32 @@ API with `python -m uvicorn kompass.api.app:app --port 8000` or the UI with
 `python -m streamlit run ui/app.py`.
 
 `KOMPASS_AUTH_MODE=local` trusts request identity fields and is development-only. Setting it
-to `oidc` fails closed until a verified-claims ingress adapter is configured.
+to `oidc` activates discovery/JWKS validation and requires issuer/audience configuration.
+
+### Complete zero-cost local stack
+
+Docker Compose starts exactly three services: the app, PostgreSQL 17, and Keycloak 26.7. All
+images and credentials are local development fixtures; no cloud account, card, or subscription is
+used.
+
+```bash
+docker compose up -d --build
+curl http://localhost:8000/health
+```
+
+Keycloak is available at `http://localhost:8081` and imports two isolated test users (`alice` in
+`tenant-a`, `bob` in `tenant-b`). The obvious passwords in `infra/keycloak/kompass-realm.json` are
+local fixtures only. PostgreSQL is bound to `127.0.0.1:55432`; app traffic uses the non-superuser
+`kompass_app`, while the local checkpointer setup uses the migration/admin connection.
+
+Side-effect receipts use PostgreSQL when `KOMPASS_DATABASE_URL` is set. The action key is bound to a
+canonical payload hash and atomically claimed before execution. The same key reaches the ACME target
+database, whose unique constraints prevent a duplicate after timeout/commit ambiguity. Repair stale
+receipts with:
+
+```bash
+docker compose exec app python -m kompass.scripts.reconcile --tenant tenant-a
+```
 
 ## Validation and evaluations
 
@@ -105,28 +131,39 @@ python -m ruff check .
 python -m pytest -q
 python -m evals.offline --ci
 python -m kompass.release
+python -m pip_audit -r requirements-production.txt --progress-spinner off
 ```
 
-The first three commands are deterministic and make no LLM or public-network calls. The full
-60-case evaluation uses configured models and an LLM judge, is opt-in, and can incur cost:
+The deterministic suite, offline gate, and release check make no paid LLM calls. With the Compose
+services running, `make test-integration` proves real OIDC, PostgreSQL checkpoints, tenant RLS,
+administrative access, and concurrent idempotency. `make load-test` records a bounded local load
+report. The reviewed live baseline uses the installed local Ollama model:
 
 ```bash
-python -m evals.run --ci
+make test-integration
+make load-test
+make evals-live-baseline
 ```
 
 <!-- EVAL:START -->
-No Evaluation V2 live-model result is committed by this implementation. Run the complete
-opt-in command above to establish a reviewed baseline; CI always runs the deterministic smoke gate.
+| Metric (n=5) | Naive RAG baseline | Kompass | Delta |
+|---|---:|---:|---:|
+| Task success | 40% | **80%** | +40pp |
+| Answer correctness (LLM judge) | 100% | **100%** | +0pp |
+| Hallucination rate | 0% | **0%** | 0pp |
+| Tool selection | 0% | **100%** | +100pp |
+| Tool arguments correct | 0% | **100%** | +100pp |
+| Retrieval relevance | 80% | **100%** | +20pp |
+| P95 latency | 23.015s | 128.484s | - |
 <!-- EVAL:END -->
 
-## Deployment boundaries
+## Local boundary
 
-The local stack is deliberately useful without Docker. A real deployment still needs an OIDC
-provider or verified identity-aware gateway, managed PostgreSQL, application-specific tenant
-enforcement/RLS, a secret manager, TLS/DNS, backup/restore, and a telemetry backend. Install
-`requirements-production.txt`, set
-`KOMPASS_CHECKPOINT_POSTGRES_DSN`, and start once with migration privileges so the official
-checkpointer can run `setup()`.
+The checked-in Compose configuration is intentionally a local development/test environment: HTTP,
+obvious fixture passwords, Keycloak development mode, one process, and local volumes. It is not a
+public deployment configuration. The synthetic ACME business database represents one organization;
+tenant RLS applies to runtime receipts and workflow ownership, not to that fixture's domain rows.
+No cloud infrastructure is required or described by this repository.
 
 See [enterprise runtime](docs/enterprise_runtime.md), [threat model](docs/threat_model.md),
 [implementation ledger](docs/enterprise_agent_runtime_plan.md), and the existing deep dives in

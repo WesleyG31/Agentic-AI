@@ -1,0 +1,24 @@
+{
+  "completed": 100,
+  "concurrency": 16,
+  "duplicate_check": "read-only scenario; action concurrency is covered separately",
+  "duplicate_effects": 0,
+  "endpoints": {
+    "health": 20,
+    "run_inspection": 80
+  },
+  "errors": 0,
+  "failure_samples": [],
+  "latency_ms": {
+    "max": 296.0,
+    "mean": 113.44,
+    "p50": 109.0,
+    "p95": 203.0
+  },
+  "requests": 100,
+  "scenario": "local_oidc_postgres_read_path",
+  "status_codes": {
+    "200": 100
+  },
+  "throughput_rps": 114.286
+}

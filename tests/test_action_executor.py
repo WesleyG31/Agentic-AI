@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+
 from langchain.agents.middleware import ToolCallRequest
 from langchain_core.messages import ToolMessage
 
@@ -49,6 +52,45 @@ def test_duplicate_invocation_returns_receipt_without_repeating_effect():
     assert first.status == ActionStatus.SUCCEEDED
     assert duplicate.duplicate is True
     assert calls == ["effect"]
+
+
+def test_concurrent_claims_execute_the_effect_once():
+    executor = _executor()
+    entered = Event()
+    release = Event()
+    calls: list[str] = []
+
+    def effect():
+        calls.append("effect")
+        entered.set()
+        release.wait(timeout=2)
+        return {"refund_id": 1}
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(executor.execute, _request(), effect, verifier=lambda _: True)
+        assert entered.wait(timeout=2)
+        second = pool.submit(executor.execute, _request(), effect, verifier=lambda _: True)
+        duplicate = second.result(timeout=2)
+        release.set()
+        completed = first.result(timeout=2)
+
+    assert completed.status == ActionStatus.SUCCEEDED
+    assert duplicate.duplicate is True
+    assert calls == ["effect"]
+
+
+def test_idempotency_key_is_bound_to_payload():
+    executor = _executor()
+    executor.execute(_request(), lambda: {"refund_id": 1}, verifier=lambda _: True)
+    conflict = executor.execute(
+        _request(arguments={"order_id": 42, "amount_eur": 11.0}),
+        lambda: {"refund_id": 2},
+        verifier=lambda _: True,
+    )
+
+    assert conflict.status == ActionStatus.FAILED
+    assert conflict.duplicate is True
+    assert conflict.error == "idempotency key reused with a different payload"
 
 
 def test_timeout_is_retried_with_a_bound_and_then_verified():

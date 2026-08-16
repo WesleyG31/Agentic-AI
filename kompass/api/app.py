@@ -13,14 +13,15 @@ Run:  uvicorn kompass.api.app:app --port 8000   (or `make api`)
 import asyncio
 import json
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessageChunk
 from langgraph.types import Command
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from kompass.config import settings
 from kompass.graph.agent import build_agent
@@ -30,10 +31,18 @@ from kompass.persistence import (
     ExecutionCapacityExceeded,
     ExecutionLimiter,
     checkpoint_saver,
+    register_workflow_thread,
 )
 from kompass.prompts import prompt_manifest
 from kompass.runtime import RuntimeContext, runtime_scope, tenant_scoped_id
 from kompass.security.identity import TOOL_SCOPES
+from kompass.security.oidc import (
+    OIDCAuthenticationError,
+    OIDCConfig,
+    OIDCVerifier,
+    get_verified_principal,
+    verified_principal_scope,
+)
 
 
 @asynccontextmanager
@@ -52,14 +61,97 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Kompass API", lifespan=lifespan)
 
 
+@lru_cache(maxsize=8)
+def _oidc_verifier(
+    issuer: str,
+    audience: str,
+    discovery_url: str,
+    jwks_url: str,
+    timeout_seconds: float,
+    clock_skew_seconds: int,
+    allow_http: bool,
+) -> OIDCVerifier:
+    return OIDCVerifier(
+        OIDCConfig(
+            issuer=issuer,
+            audience=audience,
+            discovery_url=discovery_url,
+            jwks_url=jwks_url,
+            timeout_seconds=timeout_seconds,
+            clock_skew_seconds=clock_skew_seconds,
+            allow_http=allow_http,
+        )
+    )
+
+
+def _requires_identity(path: str) -> bool:
+    return path in {"/chat", "/chat/stream", "/resume", "/feedback"} or path.startswith(
+        "/runs/"
+    )
+
+
+def _security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.middleware("http")
+async def ingress_security(request: Request, call_next):
+    """Bound request size, verify OIDC at ingress, and add API security headers."""
+    response = None
+    try:
+        raw_length = request.headers.get("content-length")
+        if raw_length is not None:
+            try:
+                content_length = int(raw_length)
+            except ValueError:
+                return _security_headers(
+                    JSONResponse(status_code=400, content={"detail": "invalid content length"})
+                )
+            if content_length > settings.max_request_bytes:
+                return _security_headers(
+                    JSONResponse(status_code=413, content={"detail": "request body too large"})
+                )
+        if settings.auth_mode == "oidc" and _requires_identity(request.url.path):
+            authorization = request.headers.get("authorization", "")
+            scheme, separator, token = authorization.partition(" ")
+            if scheme.casefold() != "bearer" or not separator or not token.strip():
+                raise OIDCAuthenticationError("bearer token required")
+            verifier = _oidc_verifier(
+                settings.oidc_issuer_url,
+                settings.oidc_audience,
+                settings.oidc_discovery_url,
+                settings.oidc_jwks_url,
+                settings.oidc_timeout_seconds,
+                settings.oidc_clock_skew_seconds,
+                settings.environment != "production",
+            )
+            principal = await verifier.verify(token.strip())
+            async with verified_principal_scope(principal):
+                response = await call_next(request)
+        else:
+            response = await call_next(request)
+    except (OIDCAuthenticationError, ValueError):
+        response = JSONResponse(
+            status_code=401,
+            content={"detail": "authentication failed"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return _security_headers(response)
+
+
 class ChatRequest(BaseModel):
-    message: str
-    thread_id: str | None = None
-    user_id: str | None = None
-    tenant_id: str | None = None
-    correlation_id: str | None = None
-    timezone: str | None = None
-    locale: str | None = None
+    message: str = Field(min_length=1, max_length=32_000)
+    thread_id: str | None = Field(default=None, min_length=1, max_length=256)
+    user_id: str | None = Field(default=None, min_length=1, max_length=256)
+    tenant_id: str | None = Field(default=None, min_length=1, max_length=128)
+    correlation_id: str | None = Field(default=None, min_length=1, max_length=256)
+    timezone: str | None = Field(default=None, min_length=1, max_length=128)
+    locale: str | None = Field(default=None, min_length=2, max_length=32)
 
 
 class EditedAction(BaseModel):
@@ -74,29 +166,41 @@ class Decision(BaseModel):
 
 
 class ResumeRequest(BaseModel):
-    thread_id: str
-    decisions: list[Decision]
-    user_id: str | None = None
-    tenant_id: str | None = None
-    correlation_id: str | None = None
-    timezone: str | None = None
-    locale: str | None = None
+    thread_id: str = Field(min_length=1, max_length=256)
+    decisions: list[Decision] = Field(min_length=1, max_length=16)
+    user_id: str | None = Field(default=None, min_length=1, max_length=256)
+    tenant_id: str | None = Field(default=None, min_length=1, max_length=128)
+    correlation_id: str | None = Field(default=None, min_length=1, max_length=256)
+    timezone: str | None = Field(default=None, min_length=1, max_length=128)
+    locale: str | None = Field(default=None, min_length=2, max_length=32)
 
 
 class FeedbackRequest(BaseModel):
-    trace_id: str
+    trace_id: str = Field(min_length=1, max_length=256)
     rating: Literal["positive", "negative"]
-    comment: str | None = None
+    comment: str | None = Field(default=None, max_length=2_000)
 
 
 def _runtime_context(req: ChatRequest | ResumeRequest) -> RuntimeContext:
-    if settings.auth_mode != "local":
-        raise HTTPException(
-            status_code=503,
-            detail="OIDC mode requires the verified-claims ingress adapter to be configured",
+    if settings.auth_mode == "oidc":
+        principal = get_verified_principal()
+        if principal is None:
+            raise HTTPException(status_code=401, detail="verified identity required")
+        if req.tenant_id is not None and req.tenant_id != principal.tenant_id:
+            raise HTTPException(status_code=403, detail="tenant claim mismatch")
+        if req.user_id is not None and req.user_id.casefold() != principal.subject.casefold():
+            raise HTTPException(status_code=403, detail="subject claim mismatch")
+        return RuntimeContext.create(
+            tenant_id=principal.tenant_id,
+            user_id=principal.subject,
+            timezone_name=req.timezone or settings.default_timezone,
+            locale=req.locale or settings.default_locale,
+            correlation_id=req.correlation_id,
+            scopes=principal.scopes,
+            roles=principal.roles,
+            principal_kind=principal.kind,
         )
-    # Local mode is explicitly a development adapter. A production deployment must replace
-    # these request fields with identity derived from a verified token/gateway assertion.
+    # Local mode is explicitly a development adapter and is never selected implicitly.
     return RuntimeContext.create(
         tenant_id=req.tenant_id or settings.default_tenant_id,
         user_id=req.user_id or "anonymous-local-user",
@@ -109,7 +213,9 @@ def _runtime_context(req: ChatRequest | ResumeRequest) -> RuntimeContext:
 
 
 def _config(thread_id: str, context: RuntimeContext) -> dict:
-    return {"configurable": {"thread_id": tenant_scoped_id(context, thread_id)}}
+    storage_thread_id = tenant_scoped_id(context, thread_id)
+    register_workflow_thread(context, storage_thread_id)
+    return {"configurable": {"thread_id": storage_thread_id}}
 
 
 def _trace_metadata(context: RuntimeContext) -> dict:
@@ -346,17 +452,13 @@ async def get_run(
     tenant_id: str | None = None,
     user_id: str | None = None,
 ) -> dict:
-    if settings.auth_mode != "local":
-        raise HTTPException(
-            status_code=503,
-            detail="OIDC mode requires the verified-claims ingress adapter to be configured",
+    context = _runtime_context(
+        ResumeRequest(
+            thread_id=thread_id,
+            decisions=[Decision(type="reject")],
+            tenant_id=tenant_id,
+            user_id=user_id,
         )
-    context = RuntimeContext.create(
-        tenant_id=tenant_id or settings.default_tenant_id,
-        user_id=user_id or "anonymous-local-user",
-        timezone_name=settings.default_timezone,
-        locale=settings.default_locale,
-        scopes=frozenset(TOOL_SCOPES.values()),
     )
     with runtime_scope(context):
         snapshot = await app.state.agent.aget_state(_config(thread_id, context))

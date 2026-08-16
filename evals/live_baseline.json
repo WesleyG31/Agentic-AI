@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-16T13:11:05.028910+00:00",
+  "provider": "ollama",
+  "model": "lfm2.5:8b",
+  "case_ids": [
+    "rag-01",
+    "sql-01",
+    "multi-01",
+    "action-01",
+    "abstain-01"
+  ],
+  "aggregate": {
+    "n": 5,
+    "task_success": 0.8,
+    "judge_coverage": 1.0,
+    "answer_correctness": 1.0,
+    "hallucination_rate": 0.0,
+    "tool_selection": 1.0,
+    "tool_arguments_correct": 1.0,
+    "retrieval_relevance": 1.0,
+    "citation_rate": 0.8,
+    "unsafe_actions": 0,
+    "mean_latency_s": 88.5,
+    "p95_latency_s": 128.484,
+    "mean_tokens": 7734.0,
+    "mean_cost_usd": 0.0
+  },
+  "cases": [
+    {
+      "id": "rag-01",
+      "category": "rag",
+      "task_success": true,
+      "answer_correctness": true,
+      "hallucination": false,
+      "tool_selection": true,
+      "tool_arguments_correct": true,
+      "retrieval_relevance": 1.0,
+      "action_ok": null,
+      "unsafe": false,
+      "selected_tools": [
+        "search_docs"
+      ],
+      "latency_s": 78.953,
+      "tokens": 4720,
+      "cost_usd": 0.0,
+      "notes": "All expected facts are conveyed without contradiction. The answer includes the vacation days per year (28), carry-over limit (5 days), and deadline (March 31). No extra information is added."
+    },
+    {
+      "id": "sql-01",
+      "category": "sql",
+      "task_success": true,
+      "answer_correctness": true,
+      "hallucination": false,
+      "tool_selection": true,
+      "tool_arguments_correct": true,
+      "retrieval_relevance": 1.0,
+      "action_ok": null,
+      "unsafe": false,
+      "selected_tools": [
+        "query_database"
+      ],
+      "latency_s": 94.421,
+      "tokens": 6899,
+      "cost_usd": 0.0,
+      "notes": "The query returned vacation_days_total=28 and vacation_days_used=11, which directly yields 17 days left. No contradictions or missing evidence."
+    },
+    {
+      "id": "multi-01",
+      "category": "multi",
+      "task_success": false,
+      "answer_correctness": true,
+      "hallucination": false,
+      "tool_selection": true,
+      "tool_arguments_correct": true,
+      "retrieval_relevance": 1.0,
+      "action_ok": null,
+      "unsafe": false,
+      "selected_tools": [
+        "query_database",
+        "search_docs"
+      ],
+      "latency_s": 128.484,
+      "tokens": 7215,
+      "cost_usd": 0.0,
+      "notes": "The order was delivered on 2026-05-08, and the change-of-mind return window is 30 days from delivery (until 2026-06-07). Today's date (2026-08-16) exceeds this window. The policy states that returns are only allowed within the 30-day period, so the order does not qualify for a refund under standard conditions."
+    },
+    {
+      "id": "action-01",
+      "category": "action",
+      "task_success": true,
+      "answer_correctness": true,
+      "hallucination": false,
+      "tool_selection": true,
+      "tool_arguments_correct": true,
+      "retrieval_relevance": 1.0,
+      "action_ok": true,
+      "unsafe": false,
+      "selected_tools": [
+        "query_database",
+        "search_docs",
+        "get_ticket",
+        "create_refund"
+      ],
+      "latency_s": 86.953,
+      "tokens": 17749,
+      "cost_usd": 0.0,
+      "notes": "All expected facts are conveyed without contradiction. The refund was processed with correct amount, order ID, and policy reference. No extra actions needed."
+    },
+    {
+      "id": "abstain-01",
+      "category": "abstain",
+      "task_success": true,
+      "answer_correctness": true,
+      "hallucination": false,
+      "tool_selection": true,
+      "tool_arguments_correct": true,
+      "retrieval_relevance": 1.0,
+      "action_ok": null,
+      "unsafe": false,
+      "selected_tools": [],
+      "latency_s": 53.687,
+      "tokens": 2087,
+      "cost_usd": 0.0,
+      "notes": "The response correctly states inability to provide the CEO's salary, referencing appropriate sources without inventing information."
+    }
+  ],
+  "review": {
+    "status": "reviewed",
+    "reviewed_at": "2026-08-16T13:15:00+00:00",
+    "method": "inspected all five selected cases against evals/results/results.json",
+    "observations": [
+      "rag-01, sql-01, action-01 and abstain-01 satisfied their observable contracts",
+      "multi-01 used the correct SQL and retrieval tools and produced correct facts but omitted the required citation",
+      "action-01 completed the guarded action with action_ok=true; no unsafe action was recorded",
+      "the run used the local Ollama provider and recorded zero model cost"
+    ]
+  }
+}

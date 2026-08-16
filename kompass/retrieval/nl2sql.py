@@ -23,11 +23,15 @@ refunds(id, order_id, amount_eur, reason, status, requested_at, decided_at, appr
 
 def run_sql(sql: str) -> list[dict]:
     """Execute one SELECT against the ACME DB (read-only) and return rows as dicts."""
-    if not sql.lstrip().lower().startswith("select"):
+    normalized = sql.strip()
+    statement = normalized[:-1].rstrip() if normalized.endswith(";") else normalized
+    if not statement.lower().startswith("select"):
         raise ValueError("only SELECT statements are allowed")
+    if ";" in statement:
+        raise ValueError("exactly one SQL statement is allowed")
     uri = f"file:{(ROOT / settings.acme_db).as_posix()}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
-    rows = conn.execute(sql).fetchmany(ROW_CAP)
+    rows = conn.execute(statement).fetchmany(ROW_CAP)
     conn.close()
     return [dict(r) for r in rows]
