@@ -13,6 +13,7 @@ env/
 # Env & secrets
 .env
 .env.local
+.env.observability
 *.key
 
 # Data artifacts (reproducible via `make seed`)
@@ -24,6 +25,8 @@ kompass_checkpoints.db*
 
 # Tooling caches
 .pytest_cache/
+.pytest_cache_codex/
+.pytest_tmp/
 .ruff_cache/
 .mypy_cache/
 .ipynb_checkpoints/
@@ -34,11 +37,7 @@ evals/*.csv
 
 # Local LLM traces (kompass/obs.py)
 runs.jsonl
-
-# Langfuse / docker volumes
-.langfuse/
-pgdata/
-qdrant_storage/
+.runtime/
 
 # OS / editor
 .DS_Store

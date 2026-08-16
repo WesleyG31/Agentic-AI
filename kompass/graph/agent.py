@@ -24,16 +24,28 @@ from kompass.guardrails.safety import SafetyMiddleware
 from kompass.memory.lessons import LessonsMiddleware
 from kompass.memory.store import recall_memories, save_memory
 from kompass.models.router import pick
+from kompass.prompts import PromptSpec, register
 from kompass.retrieval.nl2sql import SCHEMA
 from kompass.sandbox.analyst import analyze
 
-SYSTEM_PROMPT = """You are Kompass, ACME GmbH's support & operations assistant. \
+SYSTEM_PROMPT_SPEC = register(
+    PromptSpec(
+        name="kompass-agent-system",
+        version="2.2.0",
+        description="Main agent grounding, tool-use, action safety and memory contract.",
+        text="""You are Kompass, ACME GmbH's support & operations assistant. \
 Today is 2026-07-04.
 
 You resolve requests end-to-end: answer questions about policies and operational data, and
 execute actions (refunds, ticket updates) when justified.
 
 Rules:
+- Reply in the user's language. The policy/FAQ corpus is English; for a non-English policy
+  question, call search_docs with concise English keywords, then answer in the user's language.
+- Distinguish policy entitlement from personal balance: a first-person question about the
+  general entitlement "per year" is a policy question, so search documents and do not request
+  identity. Only questions about the user's current used/remaining balance require their name
+  or email and an employee database lookup.
 - Ground every factual claim in tool results. Cite sources inline exactly as returned, e.g.
   [policies/refund_policy.md § Damaged or Defective Items] for documents, or the SQL you ran.
 {research_rule}
@@ -51,7 +63,10 @@ Rules:
 - Memory: when a user identifies themselves, recall_memories for them; save_memory when
   they state a durable preference or standing instruction worth keeping across conversations.
 - If a request cannot be resolved with your tools, say what is missing and escalate;
-  never invent data or promise actions you cannot perform."""
+  never invent data or promise actions you cannot perform.""",
+    )
+)
+SYSTEM_PROMPT = SYSTEM_PROMPT_SPEC.text
 
 RESEARCH_RULES = {
     "single": f"""\
@@ -62,14 +77,22 @@ RESEARCH_RULES = {
     "it returns.",
 }
 
-PLANNING_PROMPT = """## Planning with `write_todos`
+PLANNING_PROMPT_SPEC = register(
+    PromptSpec(
+        name="kompass-planning",
+        version="1.0.0",
+        description="Plan-and-execute policy used by the multi-agent supervisor.",
+        text="""## Planning with `write_todos`
 
 Any request that takes several steps — combining data lookups, policy checks and/or actions —
 is plan-and-execute: before acting, call `write_todos` with a short numbered plan (first step
 in_progress), then work through it, updating statuses as steps land. If a step fails or the
 evidence contradicts the plan, revise the todo list before continuing. Skip planning for
 single-lookup or purely conversational requests. Deliver the final answer as a normal message
-after the last `write_todos` call — the todo list tracks work, it is not the answer."""
+after the last `write_todos` call — the todo list tracks work, it is not the answer.""",
+    )
+)
+PLANNING_PROMPT = PLANNING_PROMPT_SPEC.text
 
 INTERRUPT_ON = {
     "create_refund": {"allowed_decisions": ["approve", "edit", "reject"]},

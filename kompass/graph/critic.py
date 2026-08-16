@@ -6,15 +6,24 @@ supported; an ungrounded draft is sent back to the model exactly once with the
 critique attached. Evaluator-optimizer, bounded to one retry.
 """
 
+import logging
+
 from langchain.agents.middleware import AgentMiddleware, hook_config
 from langchain_core.messages import SystemMessage, ToolMessage
 from pydantic import BaseModel, Field
 
-from kompass.models.router import pick
+from kompass.models.structured import StructuredOutputError, invoke_structured
+from kompass.prompts import PromptSpec, register
 
 MARKER = "[critic]"
+logger = logging.getLogger(__name__)
 
-PROMPT = """Review a support assistant's drafted answer against the evidence its tools returned.
+PROMPT_SPEC = register(
+    PromptSpec(
+        name="kompass-grounding-critic",
+        version="1.0.0",
+        description="Checks a draft for claims unsupported by tool evidence.",
+        text="""Review a support assistant's drafted answer against the evidence its tools returned.
 Flag ONLY factual claims (numbers, dates, statuses, policy rules) that the evidence does not
 support. Citations, phrasing and judgment calls are fine.
 
@@ -22,7 +31,10 @@ Evidence:
 {evidence}
 
 Draft answer:
-{answer}"""
+{answer}""",
+    )
+)
+PROMPT = PROMPT_SPEC.text
 
 
 class Review(BaseModel):
@@ -46,11 +58,18 @@ class GroundingCritic(AgentMiddleware):
             return None  # nothing to ground against (greeting, abstention without lookups)
         if any(MARKER in str(m.content) for m in messages if isinstance(m, SystemMessage)):
             return None  # already retried once — ship it
-        review: Review = (
-            pick("fast")
-            .with_structured_output(Review)
-            .invoke(PROMPT.format(evidence="\n\n".join(evidence), answer=last.content))
-        )
+        try:
+            review = invoke_structured(
+                "fast",
+                Review,
+                PROMPT.format(evidence="\n\n".join(evidence), answer=last.content),
+            )
+        except StructuredOutputError as exc:
+            # The draft is already grounded in tool evidence. A best-effort critic
+            # must never turn a useful completed run into HTTP 500 solely because a
+            # local model emitted malformed JSON; failed attempts remain in Langfuse.
+            logger.warning("Grounding critic skipped after structured retries: %s", exc)
+            return None
         if review.grounded:
             return None
         return {

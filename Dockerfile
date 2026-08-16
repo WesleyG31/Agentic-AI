@@ -1,6 +1,6 @@
 # Kompass API image.
 #
-# Infra (Postgres, Qdrant, Langfuse) comes from `docker compose up -d`.
+# The app is local-first (Chroma + SQLite). Langfuse has a dedicated compose stack.
 # Seed the corpus once inside the container before first use:
 #   python -m kompass.scripts.seed
 FROM python:3.12-slim

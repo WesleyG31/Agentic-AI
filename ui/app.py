@@ -10,11 +10,13 @@ Run:  streamlit run ui/app.py   (requires `make api` in another terminal)
 
 import json
 import os
+from uuid import uuid4
 
 import httpx
 import streamlit as st
 
 API_URL = os.getenv("KOMPASS_API_URL", "http://localhost:8000")
+API_TIMEOUT_SECONDS = float(os.getenv("KOMPASS_UI_TIMEOUT_SECONDS", "600"))
 
 st.set_page_config(page_title="Kompass", page_icon="🧭")
 
@@ -25,9 +27,24 @@ st.set_page_config(page_title="Kompass", page_icon="🧭")
 def post(path: str, payload: dict) -> dict | None:
     """POST to the Kompass API. Returns the JSON body, or None after surfacing the error."""
     try:
-        resp = httpx.post(f"{API_URL}{path}", json=payload, timeout=120.0)
+        # Local tool-using models can take several minutes: one user turn may
+        # include safety, planning, tool calls, synthesis and critic generations.
+        timeout = httpx.Timeout(
+            connect=10.0,
+            read=API_TIMEOUT_SECONDS,
+            write=30.0,
+            pool=10.0,
+        )
+        resp = httpx.post(f"{API_URL}{path}", json=payload, timeout=timeout)
         resp.raise_for_status()
         return resp.json()
+    except httpx.ReadTimeout:
+        st.error(
+            f"Kompass sigue procesando la solicitud después de {API_TIMEOUT_SECONDS:.0f}s. "
+            "No la envíes otra vez: podría duplicar una acción. Revisa la traza en "
+            "Langfuse o aumenta KOMPASS_UI_TIMEOUT_SECONDS."
+        )
+        return None
     except httpx.HTTPError as exc:
         st.error(f"Kompass API error ({API_URL}): {exc}")
         return None
@@ -40,12 +57,26 @@ def apply_response(data: dict) -> None:
         st.session_state.pending = data["pending_actions"]
     else:
         st.session_state.pending = None
-        st.session_state.messages.append({"role": "assistant", "content": data["answer"]})
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": data["answer"],
+                "trace_id": data.get("trace_id"),
+                "trace_url": data.get("trace_url"),
+            }
+        )
 
 
 def resume(decisions: list[dict]) -> None:
     """Send reviewer decisions for the paused run and refresh the chat."""
-    data = post("/resume", {"thread_id": st.session_state.thread_id, "decisions": decisions})
+    data = post(
+        "/resume",
+        {
+            "thread_id": st.session_state.thread_id,
+            "user_id": st.session_state.user_id,
+            "decisions": decisions,
+        },
+    )
     if data:
         st.session_state.edit_idx = None
         st.session_state.reject_idx = None
@@ -99,7 +130,12 @@ def render_approval_card(i: int, action: dict, pending: list[dict]) -> None:
 
 if "messages" not in st.session_state:
     st.session_state.update(
-        messages=[], thread_id=None, pending=None, edit_idx=None, reject_idx=None
+        messages=[],
+        thread_id=None,
+        user_id=f"demo-user-{uuid4().hex[:8]}",
+        pending=None,
+        edit_idx=None,
+        reject_idx=None,
     )
 
 with st.sidebar:
@@ -118,9 +154,23 @@ with st.sidebar:
 st.title("🧭 Kompass — ACME Support & Operations")
 st.caption("Ask about policies, orders and tickets. Risky actions pause for your approval.")
 
-for msg in st.session_state.messages:
+for message_index, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        if msg.get("trace_url"):
+            st.caption(f"Trace: [{msg['trace_id']}]({msg['trace_url']})")
+        if msg["role"] == "assistant" and msg.get("trace_id"):
+            positive, negative, _ = st.columns([1, 1, 5])
+            if positive.button("👍", key=f"positive_{message_index}", help="Helpful") and post(
+                "/feedback",
+                {"trace_id": msg["trace_id"], "rating": "positive"},
+            ):
+                st.toast("Feedback saved in Langfuse")
+            if negative.button("👎", key=f"negative_{message_index}", help="Needs work") and post(
+                "/feedback",
+                {"trace_id": msg["trace_id"], "rating": "negative"},
+            ):
+                st.toast("Feedback saved in Langfuse")
 
 if st.session_state.pending:
     with st.chat_message("assistant"):
@@ -133,7 +183,14 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
     with st.spinner("Kompass is thinking…"):
-        data = post("/chat", {"message": prompt, "thread_id": st.session_state.thread_id})
+        data = post(
+            "/chat",
+            {
+                "message": prompt,
+                "thread_id": st.session_state.thread_id,
+                "user_id": st.session_state.user_id,
+            },
+        )
     if data:
         apply_response(data)
         st.rerun()

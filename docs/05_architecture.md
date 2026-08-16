@@ -50,7 +50,7 @@ Kompass is a **LangGraph v1 state graph**: a set of nodes (agents) that read and
  MEMORY        conversation (short) + per-user store (long)
                + self-improving loop (Tier 2)
  CROSS-CUTTING observability: Langfuse · typed outputs: Pydantic
-               durable state: Postgres checkpointer
+               durable local state: SQLite checkpointer
 ```
 
 The flow reads top to bottom: a **trigger** starts a run; the **planner** turns a goal into steps; the **supervisor** dispatches each step to a specialist worker and loops until the goal is met or a budget is hit; **read** work (retrieval, research, analysis) is unrestricted; **write** work (any side effect) is funnelled through the **action agent → HITL gate → execute** path; a **critic** checks grounding before anything is shown or committed; **memory** and **observability** cut across the whole graph.
@@ -93,7 +93,7 @@ A 2026 reference agent has **two** interoperability planes, and confusing them i
         ▼                ▼                 ▼
    doc_search        sql server        ticketing
    MCP server        MCP server        MCP server
-   (Chroma/Qdrant)   (ACME DB)         (refunds, tickets)
+      (Chroma)       (ACME DB)         (refunds, tickets)
 ```
 
 | | **MCP** — Model Context Protocol | **A2A** — Agent-to-Agent |
@@ -152,7 +152,7 @@ Capabilities are grouped so the project can be **shipped and defended incrementa
 
 ## The stack
 
-Every choice is pinned in `kompass/config.py` and toggled by `.env`, so the same graph runs **local-first** (zero infra) or in a **durable production profile** (`docker compose up -d`).
+Every implemented runtime choice is pinned in `kompass/config.py`. The agent runs **local-first** with Chroma and SQLite; Docker is reserved for the Langfuse observability stack.
 
 | Layer | Choice | Why | Local default → Prod |
 |---|---|---|---|
@@ -160,7 +160,7 @@ Every choice is pinned in `kompass/config.py` and toggled by `.env`, so the same
 | **Reasoning model** | **GPT-5.5** (`openai:gpt-5.5`) | Hardest planning / verification steps. | via model router |
 | **Balanced model** | **GPT-5.4** (`openai:gpt-5.4`) | Default drafting / synthesis. | via model router |
 | **Fast / routing model** | **GPT-5.4 nano** (`openai:gpt-5.4-nano`) | Cheap classification, the retrieval router, safety pre-screen → **model routing**. | via model router |
-| **Vector store** | **Chroma** (local) → **Qdrant** (prod) | Hybrid dense+sparse search + reranker. | `.chroma` → `qdrant:6333` |
+| **Vector store** | **Chroma** | Hybrid dense+sparse search + reranker, with no unused external service. | `.chroma` |
 | **Graph retrieval** | **GraphRAG library** | Multi-hop relational questions (Tier 3-leaning). | — |
 | **Tools** | **Own MCP servers** — `doc_search`, `sql`, `ticketing` | Typed, swappable, permissioned tool contracts (vertical layer). | — |
 | **Observability** | **Langfuse** (self-hosted) | Full traces, cost, latency, eval scores. | disabled → `langfuse:3000` |

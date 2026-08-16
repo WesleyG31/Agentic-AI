@@ -11,9 +11,10 @@ singleton anywhere in the package:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Repo root — relative paths in settings (DB, Chroma) resolve against this, so
@@ -36,10 +37,24 @@ class Settings(BaseSettings):
     # ── Model provider ────────────────────────────────────────────────
     # Models are "provider:model" strings resolved by langchain's init_chat_model,
     # so switching provider is a config change, not a code change.
+    # Select the chat backend without touching application code.
+    # Ollama runs locally; OpenAI uses OPENAI_API_KEY.
+    llm_provider: Literal["openai", "ollama"] = Field(
+        default="ollama", alias="KOMPASS_LLM_PROVIDER"
+    )
+
+    # OpenAI model tiers. Existing provider:model values remain supported.
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     model_reasoning: str = Field(default="openai:gpt-5.5", alias="KOMPASS_MODEL_REASONING")
     model_balanced: str = Field(default="openai:gpt-5.4", alias="KOMPASS_MODEL_BALANCED")
     model_fast: str = Field(default="openai:gpt-5.4-nano", alias="KOMPASS_MODEL_FAST")
+
+    # Ollama model tiers. One local model can serve all three roles, or each
+    # tier can point at a different model downloaded with `ollama pull`.
+    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+    ollama_model_reasoning: str = Field(default="lfm2.5:8b", alias="KOMPASS_OLLAMA_MODEL_REASONING")
+    ollama_model_balanced: str = Field(default="lfm2.5:8b", alias="KOMPASS_OLLAMA_MODEL_BALANCED")
+    ollama_model_fast: str = Field(default="lfm2.5:8b", alias="KOMPASS_OLLAMA_MODEL_FAST")
 
     # ── Agent ─────────────────────────────────────────────────────────
     # single = one agent with all tools; multi = supervisor delegates research
@@ -49,25 +64,29 @@ class Settings(BaseSettings):
     token_budget: int = Field(default=200_000, alias="KOMPASS_TOKEN_BUDGET")
 
     # ── Retrieval ─────────────────────────────────────────────────────
-    vector_backend: str = Field(default="chroma", alias="KOMPASS_VECTOR_BACKEND")
     chroma_path: str = Field(default=".chroma", alias="KOMPASS_CHROMA_PATH")
-    qdrant_url: str = Field(default="http://localhost:6333", alias="QDRANT_URL")
     acme_db: str = Field(default="corpus/acme.db", alias="KOMPASS_ACME_DB")
 
     # ── Persistence / durable HITL ────────────────────────────────────
-    checkpointer: str = Field(default="sqlite", alias="KOMPASS_CHECKPOINTER")
     sqlite_checkpoint: str = Field(
         default="kompass_checkpoints.db", alias="KOMPASS_SQLITE_CHECKPOINT"
-    )
-    postgres_url: str = Field(
-        default="postgresql://kompass:kompass@localhost:5432/kompass", alias="POSTGRES_URL"
     )
 
     # ── Observability ─────────────────────────────────────────────────
     langfuse_enabled: bool = Field(default=False, alias="LANGFUSE_ENABLED")
-    langfuse_host: str = Field(default="http://localhost:3000", alias="LANGFUSE_HOST")
+    langfuse_base_url: str = Field(
+        default="http://localhost:3000",
+        validation_alias=AliasChoices("LANGFUSE_BASE_URL", "LANGFUSE_HOST"),
+    )
     langfuse_public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
+    langfuse_environment: str = Field(default="development", alias="LANGFUSE_TRACING_ENVIRONMENT")
+    langfuse_release: str = Field(default="local", alias="LANGFUSE_RELEASE")
+    langfuse_mask_pii: bool = Field(default=True, alias="LANGFUSE_MASK_PII")
+    # Ollama is free locally. Hosted-provider prices are explicit configuration
+    # because vendor price lists change independently from this repository.
+    input_cost_per_million: float = Field(default=0.0, alias="KOMPASS_INPUT_COST_PER_MILLION")
+    output_cost_per_million: float = Field(default=0.0, alias="KOMPASS_OUTPUT_COST_PER_MILLION")
 
     # ── Serving ───────────────────────────────────────────────────────
     api_host: str = Field(default="0.0.0.0", alias="KOMPASS_API_HOST")

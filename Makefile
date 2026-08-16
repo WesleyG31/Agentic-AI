@@ -5,7 +5,7 @@
 PY ?= python
 
 .DEFAULT_GOAL := help
-.PHONY: help install seed demo evals test lint fmt up down ui api clean
+.PHONY: help install seed demo evals test lint fmt ui api clean observability-init observability-up observability-down observability-logs prompts-sync dataset-sync
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -38,11 +38,23 @@ api: ## Serve the FastAPI app
 ui: ## Launch the Streamlit chat UI
 	$(PY) -m streamlit run ui/app.py
 
-up: ## Start optional infra (Qdrant, Postgres, Langfuse)
-	docker compose up -d
+observability-init: ## Generate local Langfuse secrets and configure the SDK
+	$(PY) -m kompass.scripts.observability_env
 
-down: ## Stop infra
-	docker compose down
+observability-up: ## Start Langfuse OSS v4 at http://localhost:3000
+	docker compose --env-file .env.observability -f docker-compose.observability.yml up -d
+
+observability-down: ## Stop Langfuse without deleting its persistent data
+	docker compose --env-file .env.observability -f docker-compose.observability.yml down
+
+observability-logs: ## Follow Langfuse web and worker logs
+	docker compose --env-file .env.observability -f docker-compose.observability.yml logs -f langfuse-web langfuse-worker
+
+prompts-sync: ## Publish code-versioned prompts to Langfuse Prompt Management
+	$(PY) -m kompass.scripts.sync_prompts
+
+dataset-sync: ## Publish the 60-case golden dataset to Langfuse
+	$(PY) -m evals.sync_dataset
 
 clean: ## Remove local data artifacts and caches
 	rm -rf .chroma corpus/acme.db kompass_checkpoints.db .pytest_cache .ruff_cache

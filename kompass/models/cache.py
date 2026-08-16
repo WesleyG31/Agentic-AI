@@ -12,10 +12,27 @@ action or any DB state change, since that state moves. The caller decides when t
 from uuid import uuid4
 
 import chromadb
+from langchain_core.messages import ToolMessage
 
 from kompass.config import ROOT, settings
 
-COLLECTION = "answer_cache"
+# v2 leaves the previous collection intact but makes its ungrounded entries
+# unreachable. Bump this schema when cache correctness rules materially change.
+COLLECTION = "answer_cache_v2"
+CACHE_SCHEMA_VERSION = "2"
+_CACHEABLE_TOOLS = {"search_docs"}
+_UNRESOLVED_MARKERS = (
+    "no encontré",
+    "no encontre",
+    "no tengo información",
+    "no tengo informacion",
+    "no hay información",
+    "no hay informacion",
+    "could not find",
+    "couldn't find",
+    "no information",
+    "not documented",
+)
 
 
 def _collection() -> chromadb.Collection:
@@ -42,7 +59,31 @@ def lookup(question: str, threshold: float = 0.2) -> str | None:
 
 def store(question: str, answer: str) -> None:
     """Cache a READ-only answer keyed by its question. Caller guarantees no state change."""
-    _collection().add(ids=[uuid4().hex], documents=[question], metadatas=[{"answer": answer}])
+    _collection().add(
+        ids=[uuid4().hex],
+        documents=[question],
+        metadatas=[{"answer": answer, "schema_version": CACHE_SCHEMA_VERSION}],
+    )
+
+
+def can_store(messages: list, answer: str) -> bool:
+    """Only cache grounded answers backed exclusively by immutable documents.
+
+    SQL results can become stale, action results must never be replayed, and
+    abstentions should be retried after retrieval improvements instead of becoming
+    durable false negatives.
+    """
+    tool_names = {
+        message.name
+        for message in messages
+        if isinstance(message, ToolMessage) and getattr(message, "name", None)
+    }
+    normalized_answer = answer.casefold()
+    return (
+        bool(tool_names)
+        and tool_names <= _CACHEABLE_TOOLS
+        and not any(marker in normalized_answer for marker in _UNRESOLVED_MARKERS)
+    )
 
 
 def clear() -> None:

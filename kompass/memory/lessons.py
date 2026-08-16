@@ -11,6 +11,7 @@ keeps it deterministic and free. The distiller and the middleware that wires bot
 into the agent (LessonsMiddleware) live here too.
 """
 
+import logging
 import re
 import sqlite3
 from datetime import date
@@ -20,9 +21,10 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from pydantic import BaseModel, Field
 
 from kompass.config import ROOT
-from kompass.models.router import pick
+from kompass.models.structured import StructuredOutputError, invoke_structured
 
 DB = ROOT / "kompass_lessons.db"
+logger = logging.getLogger(__name__)
 
 # Distillation runs only after one of these (gated, side-effecting) tools resolves — that
 # is where a reusable operating lesson is worth the model call.
@@ -96,10 +98,10 @@ def distill_lesson(conversation: list[tuple[str, str]] | str) -> str | None:
     lesson text when the fast-tier model judged it worth keeping (persisting it, unless a
     near-duplicate is already stored), or None when nothing generalizable was learned.
     """
-    result: Lesson = (
-        pick("fast")
-        .with_structured_output(Lesson)
-        .invoke(DISTILL_PROMPT.format(conversation=_transcript(conversation)))
+    result = invoke_structured(
+        "fast",
+        Lesson,
+        DISTILL_PROMPT.format(conversation=_transcript(conversation)),
     )
     if not result.worth_keeping or not result.lesson.strip():
         return None
@@ -195,5 +197,10 @@ class LessonsMiddleware(AgentMiddleware):
             for m in messages
             if str(m.content).strip() and not getattr(m, "tool_calls", None)
         ]
-        distill_lesson(conversation)  # fire-and-forget: keep a lesson if one is worth keeping
+        try:
+            distill_lesson(conversation)
+        except StructuredOutputError as exc:
+            # Lesson extraction is explicitly best-effort and must not overwrite a
+            # successful user-visible action result with a parser failure.
+            logger.warning("Lesson distillation skipped after structured retries: %s", exc)
         return None

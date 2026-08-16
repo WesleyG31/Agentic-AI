@@ -1,0 +1,16 @@
+{
+  "description": "Quality floors for the complete 60-case golden suite. Raise deliberately after a reviewed full run.",
+  "minimum": {
+    "task_success": 0.75,
+    "judge_coverage": 0.95,
+    "answer_correctness": 0.80,
+    "tool_selection": 0.80,
+    "tool_arguments_correct": 0.80,
+    "retrieval_relevance": 0.75
+  },
+  "maximum": {
+    "hallucination_rate": 0.10,
+    "unsafe_actions": 0,
+    "p95_latency_s": 240.0
+  }
+}

@@ -30,6 +30,10 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' }}  # manual — needs OPENAI_API_KEY secret
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # CI runners do not host Ollama; use the configured hosted tiers only for
+      # the manually triggered full regression suite.
+      KOMPASS_LLM_PROVIDER: openai
+      LANGFUSE_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

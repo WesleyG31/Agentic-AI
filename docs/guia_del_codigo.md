@@ -133,12 +133,13 @@ kompass/
 │   ├── api/         → FastAPI: /chat, /chat/stream, /resume, /runs/{id}                   [T1]
 │   ├── scripts/     → seed (siembra BD+índice) + demo (recorrido HITL)                    [—]
 │   ├── config.py    → Settings tipada (todo lo ajustable vive aquí, desde .env)
-│   └── obs.py       → traza local (runs.jsonl) + Langfuse opcional
+│   ├── obs.py       → respaldo local ligero en runs.jsonl
+│   └── observability.py → traza jerárquica Langfuse, sesiones, scores y costos
 ├── spike_frameworks/→ Researcher reimplementado en PydanticAI + comparison.md             [T3]
 ├── evals/           → golden set + juez LLM + baseline + red_team + user_simulator        [T1/T2]
 ├── ui/              → chat Streamlit con citas + tarjeta de aprobación HITL               [T1]
 ├── tests/           → suite pytest (offline, sin API key)
-├── Dockerfile · docker-compose.yml · Makefile · requirements*.txt · .env.example
+├── Dockerfile · docker-compose.observability.yml · Makefile · requirements*.txt · .env.example
 └── *.db             → artefactos locales (ver §10)
 ```
 
@@ -250,9 +251,9 @@ Tres servidores FastMCP que corren como **subprocesos stdio**, lanzados por `mcp
 | Archivo | Qué hace | Notas |
 |---|---|---|
 | [`Dockerfile`](../Dockerfile) | Imagen del API sobre `python:3.12-slim`, servida con uvicorn en 8000 | Solo dependencias runtime; hay que `seed` dentro del contenedor |
-| [`docker-compose.yml`](../docker-compose.yml) | Infra opcional "producción": Postgres (checkpointer durable), Qdrant, Langfuse | El demo núcleo **no** la necesita (Chroma + SQLite local) |
+| [`docker-compose.observability.yml`](../docker-compose.observability.yml) | Stack completo de Langfuse v4: web, worker y sus cuatro dependencias obligatorias | No contiene Qdrant ni Postgres de aplicación porque el código no los utiliza |
 | [`Makefile`](../Makefile) | Interfaz de un comando (ver §11) | En Windows sin `make`, correr los `python -m …` |
-| [`requirements.txt`](../requirements.txt) / [`requirements-dev.txt`](../requirements-dev.txt) | Runtime / dev+eval | Postgres+Langfuse van comentados (opt-in) |
+| [`requirements.txt`](../requirements.txt) / [`requirements-dev.txt`](../requirements-dev.txt) | Runtime / dev+eval | El SDK Langfuse está incluido; el servidor es opt-in mediante Docker |
 | [`.env.example`](../.env.example) | Plantilla de configuración por variables de entorno | Ver §9 |
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | CI: lint+test en cada push/PR; evals on-demand (manual) | Usa Python 3.11 |
 | [`corpus/`](../corpus) | Datos sintéticos ACME: `faq/`, `policies/` (RAG) + `sql/seed.sql` (BD) | Ver §10 |
@@ -302,11 +303,10 @@ resueltos por `init_chat_model`, así que **cambiar de proveedor es editar `.env
 | `model_fast` | `KOMPASS_MODEL_FAST` | `openai:gpt-5.4-nano` | clasificación/routing/pre-screen de seguridad |
 | `agent_mode` | `KOMPASS_AGENT_MODE` | `single` | `single` (todas las tools) o `multi` (supervisor + worker) |
 | `token_budget` | `KOMPASS_TOKEN_BUDGET` | `200000` | cap de tokens por run (backstop de costo) |
-| `vector_backend` / `chroma_path` | `KOMPASS_VECTOR_BACKEND` / `KOMPASS_CHROMA_PATH` | `chroma` / `.chroma` | vector store local (o `qdrant`) |
+| `chroma_path` | `KOMPASS_CHROMA_PATH` | `.chroma` | vector store local realmente conectado |
 | `acme_db` | `KOMPASS_ACME_DB` | `corpus/acme.db` | BD operativa ACME (SQLite) |
-| `checkpointer` / `sqlite_checkpoint` | `KOMPASS_CHECKPOINTER` / `KOMPASS_SQLITE_CHECKPOINT` | `sqlite` / `kompass_checkpoints.db` | persistencia durable del HITL |
-| `postgres_url` | `POSTGRES_URL` | `postgresql://kompass:kompass@localhost:5432/kompass` | checkpointer de producción |
-| `langfuse_enabled` / `langfuse_host` | `LANGFUSE_ENABLED` / `LANGFUSE_HOST` | `false` / `http://localhost:3000` | observabilidad remota opcional |
+| `sqlite_checkpoint` | `KOMPASS_SQLITE_CHECKPOINT` | `kompass_checkpoints.db` | persistencia durable local de HITL |
+| `langfuse_enabled` / `langfuse_base_url` | `LANGFUSE_ENABLED` / `LANGFUSE_BASE_URL` | `false` / `http://localhost:3000` | observabilidad visual opcional |
 | `api_host` / `api_port` | `KOMPASS_API_HOST` / `KOMPASS_API_PORT` | `0.0.0.0` / `8000` | superficie API |
 | `a2a_secret` / `a2a_port` | `KOMPASS_A2A_SECRET` / `KOMPASS_A2A_PORT` | `dev-secret-change-me` / `8030` | firma HMAC y puerto del server A2A |
 | `trigger_port` | `KOMPASS_TRIGGER_PORT` | `8040` | puerto del webhook de triggers |
